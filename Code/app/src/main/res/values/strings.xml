@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">FoodDelivery</string>
+    <string name="destination_address">Địa chỉ nhận hàng</string>
+    <string name="confirm_order">Xác nhận đặt hàng</string>
+    <string name="restaurant_name">Quán: %1$s</string>
+    <string name="price_format">Giá: %1$s VNĐ</string>
+    <string name="empty_food_list">Chưa có món ăn nào</string>
+    <string name="order_now">Đặt giao hàng</string>
+    <string name="restaurant_address">Địa chỉ quán: %1$s</string>
+    <string name="fee_preview">Phí ship dự kiến: %1$s VNĐ</string>
 </resources>
