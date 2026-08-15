@@ -24,7 +24,7 @@ class DeliveryRepositoryImpl(
 ) : DeliveryRepository {
 
     override suspend fun createRequest(request: DeliveryRequest): Result<Unit> = runCatching {
-        dao.insert(request.toEntity())
+        dao.insertWithInitialLog(request.toEntity())
     }
 
     override suspend fun cancelRequest(requestId: String): Result<Unit> =
