@@ -63,4 +63,20 @@ interface DeliveryRequestDao {
             )
         )
     }
+
+    /**
+     * Insert đơn hàng mới + ghi log trạng thái ban đầu (PENDING) CÙNG 1 transaction.
+     * Atomic — nếu insert đơn thành công mà ghi log lỗi thì huỷ cả hai, không để dữ liệu nửa vời.
+     */
+    @Transaction
+    suspend fun insertWithInitialLog(request: DeliveryRequestEntity) {
+        insert(request)
+        insertStatusLog(
+            StatusLogEntity(
+                deliveryRequestId = request.id,
+                status = request.status,
+                timestamp = request.createdAt
+            )
+        )
+    }
 }

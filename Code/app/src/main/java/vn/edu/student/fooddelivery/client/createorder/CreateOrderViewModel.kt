@@ -12,6 +12,7 @@ import vn.edu.student.fooddelivery.domain.model.*
 import vn.edu.student.fooddelivery.data.repository.*
 import vn.edu.student.fooddelivery.domain.util.FeeCalculator
 import vn.edu.student.fooddelivery.domain.util.UiState
+import vn.edu.student.fooddelivery.domain.validation.InputValidator
 import java.util.UUID
 
 class CreateOrderViewModel(
@@ -23,20 +24,25 @@ class CreateOrderViewModel(
 
     private val foodId: String = checkNotNull(savedStateHandle["foodId"])
 
-    // Lưu tạm dữ liệu món ăn và nhà hàng
     private var currentFood: FoodItem? = null
     private var currentRestaurant: Restaurant? = null
 
-    // State cho UI
     private val _uiState = MutableStateFlow<UiState<Unit>>(UiState.Success(Unit))
     val uiState: StateFlow<UiState<Unit>> = _uiState.asStateFlow()
 
-    // State cho form nhập liệu
     private val _address = MutableStateFlow("")
     val address: StateFlow<String> = _address.asStateFlow()
 
     private val _addressError = MutableStateFlow<String?>(null)
     val addressError: StateFlow<String?> = _addressError.asStateFlow()
+
+    // ---- MỚI: hiển thị cho người dùng thấy trước khi xác nhận ----
+    private val _restaurantAddress = MutableStateFlow("")
+    val restaurantAddress: StateFlow<String> = _restaurantAddress.asStateFlow()
+
+    private val _feePreview = MutableStateFlow<Double?>(null)
+    val feePreview: StateFlow<Double?> = _feePreview.asStateFlow()
+    // ----------------------------------------------------------------
 
     init {
         loadOrderData()
@@ -48,6 +54,13 @@ class CreateOrderViewModel(
             try {
                 currentFood = foodRepo.getFoodItemById(foodId)
                 currentRestaurant = currentFood?.let { foodRepo.getRestaurantById(it.restaurantId) }
+
+                currentRestaurant?.let { _restaurantAddress.value = it.address }
+                currentFood?.let { food ->
+                    val distanceKm = 5.0 // TODO: mock, chưa có Maps API — ghi rõ trong báo cáo
+                    _feePreview.value = FeeCalculator.calculate(distanceKm, food.weightGram)
+                }
+
                 _uiState.value = UiState.Success(Unit)
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Error loading data")
@@ -57,20 +70,24 @@ class CreateOrderViewModel(
 
     fun onAddressChange(newAddress: String) {
         _address.value = newAddress
-        // Validate động khi gõ: Không rỗng, tối thiểu 5 ký tự
-        if (newAddress.trim().length < 5) {
-            _addressError.value = "Địa chỉ phải có ít nhất 5 ký tự"
+        _addressError.value = if (!InputValidator.isValidAddress(newAddress)) {
+            "Địa chỉ phải có ít nhất 5 ký tự"
         } else {
-            _addressError.value = null
+            null
         }
     }
 
     fun submitOrder(onSuccess: () -> Unit) {
         val destAddress = _address.value.trim()
 
-        // Validate bắt buộc trước khi tạo đơn
-        if (destAddress.length < 5) {
+        if (!InputValidator.isValidAddress(destAddress)) {
             _addressError.value = "Địa chỉ phải có ít nhất 5 ký tự"
+            return
+        }
+
+        val fee = _feePreview.value
+        if (fee == null) {
+            _uiState.value = UiState.Error("Chưa tính được phí ship, thử lại")
             return
         }
 
@@ -81,20 +98,14 @@ class CreateOrderViewModel(
                 val food = currentFood ?: throw Exception("Food missing")
                 val restaurant = currentRestaurant ?: throw Exception("Restaurant missing")
 
-                // Tính khoảng cách giả lập (do chưa có Google Maps API) - giả sử 5.0 km
-                val distanceKm = 5.0
-
-                // Sử dụng công thức tính phí từ FeeCalculator
-                val fee = FeeCalculator.calculate(distanceKm, food.weightGram)
-
                 val newRequest = DeliveryRequest(
                     id = UUID.randomUUID().toString(),
                     clientId = user.id,
                     foodItemId = food.id,
-                    restaurantAddress = restaurant.address, // Snapshot lúc tạo đơn
+                    restaurantAddress = restaurant.address,
                     destinationAddress = destAddress,
                     fee = fee,
-                    status = OrderStatus.PENDING, // Trạng thái ban đầu bắt buộc là PENDING
+                    status = OrderStatus.PENDING,
                     shipperId = null,
                     createdAt = System.currentTimeMillis(),
                     lastStatusUpdateAt = System.currentTimeMillis(),

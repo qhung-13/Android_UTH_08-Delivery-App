@@ -10,10 +10,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import vn.edu.student.fooddelivery.R
 import vn.edu.student.fooddelivery.domain.model.FoodItem
-import vn.edu.student.fooddelivery.domain.util.UiState
-import vn.edu.student.fooddelivery.ui.components.*
+import vn.edu.student.fooddelivery.ui.components.UiStateContent
 
 @Composable
 fun HomeScreen(
@@ -21,16 +21,15 @@ fun HomeScreen(
     onNavigateToFoodDetail: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    when (val state = uiState) {
-        is UiState.Loading -> LoadingIndicator()
-        is UiState.Empty -> EmptyState(message = stringResource(R.string.empty_food_list))
-        is UiState.Error -> ErrorState(message = state.message)
-        is UiState.Success -> {
-            FoodList(
-                foodItems = state.data,
-                onItemClick = { foodId -> onNavigateToFoodDetail(foodId) }
-            )
-        }
+
+    UiStateContent(
+        state = uiState,
+        emptyMessage = stringResource(R.string.empty_food_list)
+    ) { foodList ->
+        FoodList(
+            foodItems = foodList,
+            onItemClick = { foodId -> onNavigateToFoodDetail(foodId) }
+        )
     }
 }
 
