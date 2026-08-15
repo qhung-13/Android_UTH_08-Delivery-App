@@ -7,9 +7,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import vn.edu.student.fooddelivery.R
-import vn.edu.student.fooddelivery.domain.util.UiState
-import vn.edu.student.fooddelivery.ui.components.*
+import vn.edu.student.fooddelivery.ui.components.PrimaryButton
+import vn.edu.student.fooddelivery.ui.components.UiStateContent
 
 @Composable
 fun FoodDetailScreen(
@@ -18,26 +19,18 @@ fun FoodDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    when (val state = uiState) {
-        is UiState.Loading -> LoadingIndicator()
-        is UiState.Empty -> Unit
-        is UiState.Error -> ErrorState(message = state.message)
-        is UiState.Success -> {
-            val data = state.data
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = data.foodItem.name, style = MaterialTheme.typography.headlineSmall)
-                Text(text = stringResource(R.string.restaurant_name, data.restaurant.name))
-                Text(text = stringResource(R.string.price_format, data.foodItem.price))
+    UiStateContent(state = uiState) { data ->
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = data.foodItem.name, style = MaterialTheme.typography.headlineSmall)
+            Text(text = stringResource(R.string.restaurant_name, data.restaurant.name))
+            Text(text = stringResource(R.string.price_format, data.foodItem.price.toString()))
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Button(
-                    onClick = { onNavigateToCreateOrder(data.foodItem.id) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = stringResource(R.string.order_now))
-                }
-            }
+            PrimaryButton(
+                text = stringResource(R.string.order_now),
+                onClick = { onNavigateToCreateOrder(data.foodItem.id) }
+            )
         }
     }
 }
