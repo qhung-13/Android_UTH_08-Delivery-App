@@ -11,6 +11,7 @@ import vn.edu.student.fooddelivery.domain.model.User
 interface UserRepository {
     suspend fun createUser(user: User): Result<Unit>
     suspend fun getUserById(id: String): User?
+    suspend fun getAllUsers(): List<User>
     fun getCurrentUser(): Flow<User?>
     suspend fun setCurrentUser(userId: String)
     suspend fun clearCurrentUser()
@@ -27,6 +28,9 @@ class UserRepositoryImpl(
 
     override suspend fun getUserById(id: String): User? =
         userDao.getById(id)?.toDomain()
+
+    override suspend fun getAllUsers(): List<User> =
+        userDao.getAll().map { it.toDomain() }
 
     override fun getCurrentUser(): Flow<User?> =
         sessionManager.currentUserIdFlow.map { userId ->
