@@ -26,7 +26,17 @@ class AuthViewModel(
     private val _registerError = MutableStateFlow<String?>(null)
     val registerError: StateFlow<String?> = _registerError.asStateFlow()
 
+    private val _allAccounts = MutableStateFlow<List<User>>(emptyList())
+    val allAccounts: StateFlow<List<User>> = _allAccounts.asStateFlow()
+
+    fun refreshAccounts() {
+        viewModelScope.launch {
+            _allAccounts.value = userRepository.getAllUsers()
+        }
+    }
+
     init {
+        refreshAccounts()
         userRepository.getCurrentUser()
             .onEach { user -> _currentUser.value = UiState.Success(user) }
             .catch { e -> _currentUser.value = UiState.Error(e.message ?: "Lỗi tải phiên đăng nhập") }
