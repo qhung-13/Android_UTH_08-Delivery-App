@@ -1,0 +1,60 @@
+package vn.edu.student.fooddelivery.shipper.availablelist
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
+import vn.edu.student.fooddelivery.data.repository.DeliveryRepository
+import vn.edu.student.fooddelivery.data.repository.UserRepository
+import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
+import vn.edu.student.fooddelivery.domain.util.UiState
+
+class AvailableOrdersViewModel(
+    private val deliveryRepository: DeliveryRepository,
+    private val userRepository: UserRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<UiState<List<DeliveryRequest>>>(UiState.Loading)
+    val uiState: StateFlow<UiState<List<DeliveryRequest>>> = _uiState.asStateFlow()
+
+    init {
+        loadData()
+    }
+
+    fun loadData() {
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            try {
+                deliveryRepository.getPendingRequests()
+                    .catch { e ->
+                        _uiState.value = UiState.Error(e.message ?: "Có lỗi xảy ra")
+                    }
+                    .collect { requests ->
+                        _uiState.value = if (requests.isEmpty()) {
+                            UiState.Empty
+                        } else {
+                            UiState.Success(requests)
+                        }
+                    }
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Có lỗi xảy ra")
+            }
+        }
+    }
+
+    fun acceptRequest(orderId: String) {
+        viewModelScope.launch {
+            try {
+                val user = userRepository.getCurrentUser().firstOrNull()
+                if (user != null) {
+                    deliveryRepository.acceptRequest(requestId = orderId, shipperId = user.id)
+                    loadData()
+                }
+            } catch (_: Exception) { }
+        }
+    }
+}
