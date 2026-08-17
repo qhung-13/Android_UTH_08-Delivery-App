@@ -24,6 +24,7 @@ import vn.edu.student.fooddelivery.ui.components.LoadingIndicator
 @Composable
 fun ShipperOrderDetailScreen(
     viewModel: ShipperOrderDetailViewModel,
+    shipperId: String,
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,8 +92,7 @@ fun ShipperOrderDetailScreen(
                                 text = "Nhận đơn",
                                 enabled = !uiState.isUpdating,
                                 onClick = {
-                                    // Phần Accept sẽ được xử lý
-                                    // từ màn hình danh sách Shipper.
+                                    viewModel.acceptOrder(shipperId)
                                 }
                             )
                         }

@@ -73,7 +73,28 @@ class ShipperOrderDetailViewModel(
                 }
         }
     }
+    fun acceptOrder(shipperId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isUpdating = true,
+                error = null
+            )
 
+            repository.acceptRequest(
+                requestId = requestId,
+                shipperId = shipperId
+            )
+                .onSuccess {
+                    loadOrder()
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isUpdating = false,
+                        error = error.message
+                    )
+                }
+        }
+    }
     fun updateStatus(newStatus: OrderStatus) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
