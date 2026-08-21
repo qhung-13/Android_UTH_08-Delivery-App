@@ -28,6 +28,10 @@ import vn.edu.student.fooddelivery.client.home.HomeScreen
 import vn.edu.student.fooddelivery.client.home.HomeViewModel
 import vn.edu.student.fooddelivery.domain.model.Role
 import vn.edu.student.fooddelivery.domain.util.UiState
+import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersScreen
+import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersViewModel
+import vn.edu.student.fooddelivery.shipper.myorders.MyOrdersScreen
+import vn.edu.student.fooddelivery.shipper.myorders.MyOrdersViewModel
 
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
@@ -137,10 +141,46 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             Text("History screen - đang chờ Người 3 code")
         }
         composable(Screen.ShipperAvailable.route) {
-            Text("Shipper Available screen - đang chờ Người 3 code")
+
+            val availableOrdersViewModel: AvailableOrdersViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer {
+                        AvailableOrdersViewModel(
+                            app.deliveryRepository,
+                            app.userRepository
+                        )
+                    }
+                }
+            )
+
+            AvailableOrdersScreen(
+                viewModel = availableOrdersViewModel,
+                onOrderAccepted = {
+                    navController.navigate(Screen.ShipperMyOrders.route)
+                }
+            )
         }
         composable(Screen.ShipperMyOrders.route) {
-            Text("Shipper My Orders screen - đang chờ Người 3 code")
+
+            val myOrdersViewModel: MyOrdersViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer {
+                        MyOrdersViewModel(
+                            app.deliveryRepository,
+                            app.userRepository
+                        )
+                    }
+                }
+            )
+
+            MyOrdersScreen(
+                viewModel = myOrdersViewModel,
+                onOrderClick = { orderId ->
+                    navController.navigate(
+                        Screen.ShipperOrderDetail.createRoute(orderId)
+                    )
+                }
+            )
         }
         composable(
             route = Screen.ShipperOrderDetail.route,

@@ -1,5 +1,6 @@
 package vn.edu.student.fooddelivery.shipper.myorders
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +26,8 @@ import vn.edu.student.fooddelivery.ui.components.UiStateContent
 
 @Composable
 fun MyOrdersScreen(
-    viewModel: MyOrdersViewModel
+    viewModel: MyOrdersViewModel,
+    onOrderClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -38,7 +40,8 @@ fun MyOrdersScreen(
             myOrdersList = myOrdersList,
             onUpdateStatus = { orderId, newStatus ->
                 viewModel.updateStatus(orderId, newStatus)
-            }
+            },
+            onOrderClick = onOrderClick
         )
     }
 }
@@ -46,7 +49,8 @@ fun MyOrdersScreen(
 @Composable
 fun MyOrdersList(
     myOrdersList: List<DeliveryRequest>,
-    onUpdateStatus: (String, OrderStatus) -> Unit
+    onUpdateStatus: (String, OrderStatus) -> Unit,
+    onOrderClick: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -56,7 +60,11 @@ fun MyOrdersList(
     ) {
         items(myOrdersList) { order ->
             Card(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onOrderClick(order.id)
+                    }
             ) {
                 Column(
                     modifier = Modifier

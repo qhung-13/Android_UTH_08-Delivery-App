@@ -24,7 +24,8 @@ import vn.edu.student.fooddelivery.ui.components.UiStateContent
 
 @Composable
 fun AvailableOrdersScreen(
-    viewModel: AvailableOrdersViewModel
+    viewModel: AvailableOrdersViewModel,
+    onOrderAccepted: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -35,7 +36,12 @@ fun AvailableOrdersScreen(
     ) { requests ->
         AvailableOrdersList(
             requests = requests,
-            onAccept = { orderId -> viewModel.acceptRequest(orderId) }
+            onAccept = { orderId ->
+                viewModel.acceptRequest(
+                    orderId = orderId,
+                    onSuccess = onOrderAccepted
+                )
+            }
         )
     }
 }

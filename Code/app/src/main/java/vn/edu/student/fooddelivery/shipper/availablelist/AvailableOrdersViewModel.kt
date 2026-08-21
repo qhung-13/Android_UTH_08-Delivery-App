@@ -46,15 +46,29 @@ class AvailableOrdersViewModel(
         }
     }
 
-    fun acceptRequest(orderId: String) {
+    fun acceptRequest(
+        orderId: String,
+        onSuccess: () -> Unit
+    ) {
         viewModelScope.launch {
             try {
-                val user = userRepository.getCurrentUser().firstOrNull()
+                val user = userRepository
+                    .getCurrentUser()
+                    .firstOrNull()
+
                 if (user != null) {
-                    deliveryRepository.acceptRequest(requestId = orderId, shipperId = user.id)
-                    loadData()
+                    val result = deliveryRepository.acceptRequest(
+                        requestId = orderId,
+                        shipperId = user.id
+                    )
+
+                    if (result.isSuccess) {
+                        onSuccess()
+                        loadData()
+                    }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
 }
