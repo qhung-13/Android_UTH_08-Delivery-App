@@ -32,6 +32,8 @@ import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersScreen
 import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersViewModel
 import vn.edu.student.fooddelivery.shipper.myorders.MyOrdersScreen
 import vn.edu.student.fooddelivery.shipper.myorders.MyOrdersViewModel
+import vn.edu.student.fooddelivery.shipper.orderdetail.ShipperOrderDetailScreen
+import vn.edu.student.fooddelivery.shipper.orderdetail.ShipperOrderDetailViewModel
 
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
@@ -184,9 +186,34 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(
             route = Screen.ShipperOrderDetail.route,
-            arguments = listOf(navArgument("orderId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("orderId") {
+                    type = NavType.StringType
+                }
+            )
         ) {
-            Text("Shipper Order Detail screen - đang chờ Người 4 code")
+            val orderDetailViewModel: ShipperOrderDetailViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer {
+                        ShipperOrderDetailViewModel(
+                            repository = app.deliveryRepository,
+                            requestId = createSavedStateHandle()["orderId"] ?: ""
+                        )
+                    }
+                }
+            )
+
+            val currentUser by app.userRepository
+                .getCurrentUser()
+                .collectAsState(initial = null)
+
+            ShipperOrderDetailScreen(
+                viewModel = orderDetailViewModel,
+                shipperId = currentUser?.id ?: "",
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }
