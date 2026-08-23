@@ -27,8 +27,9 @@ import vn.edu.student.fooddelivery.ui.components.UiStateContent
 @Composable
 fun MyOrdersScreen(
     viewModel: MyOrdersViewModel,
-    onOrderClick: (String) -> Unit
+    onOrderClick: (String) -> Unit,
 ) {
+
     val uiState by viewModel.uiState.collectAsState()
 
     UiStateContent(

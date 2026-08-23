@@ -1,6 +1,7 @@
 package vn.edu.student.fooddelivery.shipper.availablelist
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,23 +26,44 @@ import vn.edu.student.fooddelivery.ui.components.UiStateContent
 @Composable
 fun AvailableOrdersScreen(
     viewModel: AvailableOrdersViewModel,
-    onOrderAccepted: () -> Unit
+    onOrderAccepted: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    UiStateContent(
-        state = uiState,
-        emptyMessage = "Hiện chưa có đơn hàng mới",
-        onRetry = { viewModel.loadData() }
-    ) { requests ->
-        AvailableOrdersList(
-            requests = requests,
-            onAccept = { orderId ->
-                viewModel.acceptRequest(
-                    orderId = orderId,
-                    onSuccess = onOrderAccepted
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Box(
+            modifier = Modifier.weight(1f)
+        ) {
+            UiStateContent(
+                state = uiState,
+                modifier = Modifier.fillMaxSize(),
+                emptyMessage = "Hiện chưa có đơn hàng mới",
+                onRetry = { viewModel.loadData() }
+            ) { requests ->
+                AvailableOrdersList(
+                    requests = requests,
+                    onAccept = { orderId ->
+                        viewModel.acceptRequest(
+                            orderId = orderId,
+                            onSuccess = onOrderAccepted
+                        )
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        PrimaryButton(
+            text = "Đăng Xuất",
+            onClick = onLogout,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -49,12 +71,11 @@ fun AvailableOrdersScreen(
 @Composable
 fun AvailableOrdersList(
     requests: List<DeliveryRequest>,
-    onAccept: (String) -> Unit
+    onAccept: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(requests) { order ->

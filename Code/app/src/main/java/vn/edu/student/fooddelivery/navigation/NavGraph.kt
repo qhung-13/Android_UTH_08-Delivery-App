@@ -38,7 +38,13 @@ import vn.edu.student.fooddelivery.shipper.orderdetail.ShipperOrderDetailViewMod
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
     val app = LocalContext.current.applicationContext as FoodDeliveryApp
-
+    val authViewModel: AuthViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer {
+                AuthViewModel(app.userRepository)
+            }
+        }
+    )
     fun routeForRole(role: Role): String =
         if (role == Role.CLIENT) Screen.ClientHome.route else Screen.ShipperAvailable.route
 
@@ -46,17 +52,24 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         // ---- AUTH ----
         composable(Screen.Login.route) {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = viewModelFactory { initializer { AuthViewModel(app.userRepository) } }
-            )
+//            val authViewModel: AuthViewModel = viewModel(
+//                factory = viewModelFactory { initializer { AuthViewModel(app.userRepository) } }
+//            )
             val currentUserState by authViewModel.currentUser.collectAsState()
 
             // Tự động điều hướng khi: (a) mở app đã có session cũ, hoặc (b) vừa đăng ký xong
             LaunchedEffect(currentUserState) {
                 val state = currentUserState
-                if (state is UiState.Success && state.data != null) {
-                    navController.navigate(routeForRole(state.data!!.role)) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+
+                if (state is UiState.Success) {
+                    val user = state.data
+
+                    if (user != null) {
+                        navController.navigate(routeForRole(user.role)) {
+                            popUpTo(Screen.Login.route) {
+                                inclusive = true
+                            }
+                        }
                     }
                 }
             }
@@ -88,6 +101,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 viewModel = homeViewModel,
                 onNavigateToFoodDetail = { foodId ->
                     navController.navigate(Screen.ClientFoodDetail.createRoute(foodId))
+                },
+                onLogout = {
+                    authViewModel.logout()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                    }
                 }
             )
         }
@@ -157,8 +178,18 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
             AvailableOrdersScreen(
                 viewModel = availableOrdersViewModel,
+
                 onOrderAccepted = {
                     navController.navigate(Screen.ShipperMyOrders.route)
+                },
+
+                onLogout = {
+                    authViewModel.logout()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                    }
                 }
             )
         }

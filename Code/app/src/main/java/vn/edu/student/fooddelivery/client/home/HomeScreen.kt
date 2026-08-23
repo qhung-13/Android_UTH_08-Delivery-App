@@ -18,18 +18,41 @@ import vn.edu.student.fooddelivery.ui.components.UiStateContent
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onNavigateToFoodDetail: (String) -> Unit
+    onNavigateToFoodDetail: (String) -> Unit,
+    onLogout: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    UiStateContent(
-        state = uiState,
-        emptyMessage = stringResource(R.string.empty_food_list)
-    ) { foodList ->
-        FoodList(
-            foodItems = foodList,
-            onItemClick = { foodId -> onNavigateToFoodDetail(foodId) }
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Box(
+            modifier = Modifier.weight(1f)
+        ) {
+            UiStateContent(
+                state = uiState,
+                modifier = Modifier.fillMaxSize(),
+                emptyMessage = stringResource(R.string.empty_food_list)
+            ) { foodList ->
+                FoodList(
+                    foodItems = foodList,
+                    onItemClick = { foodId ->
+                        onNavigateToFoodDetail(foodId)
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = onLogout,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Đăng Xuất")
+        }
     }
 }
 
