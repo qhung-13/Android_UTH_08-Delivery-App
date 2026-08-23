@@ -8,6 +8,7 @@ import vn.edu.student.fooddelivery.data.local.toEntity
 import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
 import vn.edu.student.fooddelivery.domain.util.OrderStatusValidator
+import vn.edu.student.fooddelivery.domain.model.StatusLog
 
 interface DeliveryRepository {
     suspend fun createRequest(request: DeliveryRequest): Result<Unit>
@@ -17,6 +18,8 @@ interface DeliveryRepository {
     fun getRequestsByShipper(shipperId: String): Flow<List<DeliveryRequest>>
     suspend fun acceptRequest(requestId: String, shipperId: String): Result<Unit>
     suspend fun updateStatus(requestId: String, newStatus: OrderStatus): Result<Unit>
+    suspend fun getRequestById(requestId: String): Result<DeliveryRequest>
+    suspend fun getStatusHistory(requestId: String): Result<List<StatusLog>>
 }
 
 class DeliveryRepositoryImpl(
@@ -72,5 +75,14 @@ class DeliveryRepositoryImpl(
             newStatus = newStatus.name,
             timestamp = System.currentTimeMillis()
         )
+    }
+
+    override suspend fun getRequestById(requestId: String): Result<DeliveryRequest> = runCatching {
+        dao.getById(requestId)?.toDomain()
+            ?: throw NoSuchElementException("Không tìm thấy đơn hàng")
+    }
+
+    override suspend fun getStatusHistory(requestId: String): Result<List<StatusLog>> = runCatching {
+        dao.getStatusHistory(requestId).map { it.toDomain() }
     }
 }
