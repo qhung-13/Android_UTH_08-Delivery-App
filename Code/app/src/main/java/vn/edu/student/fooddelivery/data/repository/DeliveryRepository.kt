@@ -9,6 +9,7 @@ import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
 import vn.edu.student.fooddelivery.domain.model.StatusLog
 import vn.edu.student.fooddelivery.domain.util.OrderStatusValidator
+import vn.edu.student.fooddelivery.domain.model.StatusLog
 
 interface DeliveryRepository {
     suspend fun createRequest(request: DeliveryRequest): Result<Unit>
@@ -76,18 +77,13 @@ class DeliveryRepositoryImpl(
             timestamp = System.currentTimeMillis()
         )
     }
-    override suspend fun getRequestById(
-        requestId: String
-    ): Result<DeliveryRequest> = runCatching {
-        val entity = dao.getById(requestId)
-            ?: throw IllegalStateException("Không tìm thấy đơn hàng")
 
-        entity.toDomain()
+    override suspend fun getRequestById(requestId: String): Result<DeliveryRequest> = runCatching {
+        dao.getById(requestId)?.toDomain()
+            ?: throw NoSuchElementException("Không tìm thấy đơn hàng")
     }
-    override suspend fun getStatusHistory(
-        requestId: String
-    ): Result<List<StatusLog>> = runCatching {
-        dao.getStatusHistory(requestId)
-            .map { it.toDomain() }
+
+    override suspend fun getStatusHistory(requestId: String): Result<List<StatusLog>> = runCatching {
+        dao.getStatusHistory(requestId).map { it.toDomain() }
     }
 }
