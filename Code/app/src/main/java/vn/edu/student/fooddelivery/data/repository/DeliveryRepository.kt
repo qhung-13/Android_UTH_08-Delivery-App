@@ -7,6 +7,7 @@ import vn.edu.student.fooddelivery.data.local.toDomain
 import vn.edu.student.fooddelivery.data.local.toEntity
 import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
+import vn.edu.student.fooddelivery.domain.model.StatusLog
 import vn.edu.student.fooddelivery.domain.util.OrderStatusValidator
 import vn.edu.student.fooddelivery.domain.model.StatusLog
 
