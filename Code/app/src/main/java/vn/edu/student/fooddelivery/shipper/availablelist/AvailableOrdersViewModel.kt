@@ -46,28 +46,21 @@ class AvailableOrdersViewModel(
         }
     }
 
-    fun acceptRequest(
-        orderId: String,
-        onSuccess: () -> Unit
-    ) {
+    fun acceptRequest(orderId: String, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
-                val user = userRepository
-                    .getCurrentUser()
-                    .firstOrNull()
-
+                val user = userRepository.getCurrentUser().firstOrNull()
                 if (user != null) {
-                    val result = deliveryRepository.acceptRequest(
-                        requestId = orderId,
-                        shipperId = user.id
-                    )
-
+                    val result = deliveryRepository.acceptRequest(requestId = orderId, shipperId = user.id)
                     if (result.isSuccess) {
-                        onSuccess()
                         loadData()
+                        onSuccess()
+                    } else {
+                        _uiState.value = UiState.Error(result.exceptionOrNull()?.message ?: "Không thể nhận đơn")
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Có lỗi xảy ra")
             }
         }
     }
