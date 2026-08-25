@@ -74,9 +74,10 @@ class AuthViewModel(
         }
     }
 
-    fun logout() {
+    fun logout(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             userRepository.clearCurrentUser()
+            onComplete()
         }
     }
 }

@@ -24,8 +24,12 @@ import vn.edu.student.fooddelivery.client.createorder.CreateOrderScreen
 import vn.edu.student.fooddelivery.client.createorder.CreateOrderViewModel
 import vn.edu.student.fooddelivery.client.fooddetail.FoodDetailScreen
 import vn.edu.student.fooddelivery.client.fooddetail.FoodDetailViewModel
+import vn.edu.student.fooddelivery.client.history.OrderHistoryScreen
+import vn.edu.student.fooddelivery.client.history.OrderHistoryViewModel
 import vn.edu.student.fooddelivery.client.home.HomeScreen
 import vn.edu.student.fooddelivery.client.home.HomeViewModel
+import vn.edu.student.fooddelivery.client.tracking.TrackingScreen
+import vn.edu.student.fooddelivery.client.tracking.TrackingViewModel
 import vn.edu.student.fooddelivery.domain.model.Role
 import vn.edu.student.fooddelivery.domain.util.UiState
 import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersScreen
@@ -103,10 +107,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     navController.navigate(Screen.ClientFoodDetail.createRoute(foodId))
                 },
                 onLogout = {
-                    authViewModel.logout()
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) {
-                            inclusive = true
+                    authViewModel.logout {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) {
+                                inclusive = true
+                            }
                         }
                     }
                 }
@@ -158,10 +163,37 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         // ---- CÁC MÀN CHƯA CODE (Người 3 / Người 4) — placeholder tạm ----
         composable(Screen.ClientTracking.route) {
-            Text("Tracking screen - đang chờ Người 3 code")
+            val trackingViewModel: TrackingViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer {
+                        TrackingViewModel(
+                            deliveryRepository = app.deliveryRepository,
+                            userRepository = app.userRepository
+                        )
+                    }
+                }
+            )
+
+            TrackingScreen(
+                viewModel = trackingViewModel
+            )
         }
         composable(Screen.ClientHistory.route) {
-            Text("History screen - đang chờ Người 3 code")
+
+            val orderHistoryViewModel: OrderHistoryViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer {
+                        OrderHistoryViewModel(
+                            deliveryRepository = app.deliveryRepository,
+                            userRepository = app.userRepository
+                        )
+                    }
+                }
+            )
+
+            OrderHistoryScreen(
+                viewModel = orderHistoryViewModel
+            )
         }
         composable(Screen.ShipperAvailable.route) {
 
@@ -184,10 +216,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 },
 
                 onLogout = {
-                    authViewModel.logout()
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) {
-                            inclusive = true
+                    authViewModel.logout {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) {
+                                inclusive = true
+                            }
                         }
                     }
                 }
@@ -228,6 +261,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     initializer {
                         ShipperOrderDetailViewModel(
                             repository = app.deliveryRepository,
+                            foodRepository = app.foodRepository,
                             requestId = createSavedStateHandle()["orderId"] ?: ""
                         )
                     }
