@@ -104,14 +104,18 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             HomeScreen(
                 viewModel = homeViewModel,
                 onNavigateToFoodDetail = { foodId ->
-                    navController.navigate(Screen.ClientFoodDetail.createRoute(foodId))
+                    navController.navigate(
+                        Screen.ClientFoodDetail.createRoute(foodId)
+                    )
+                },
+                onNavigateToTracking = {
+                    navController.navigate(Screen.ClientTracking.route)
                 },
                 onLogout = {
-                    authViewModel.logout {
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(0) {
-                                inclusive = true
-                            }
+                    authViewModel.logout()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) {
+                            inclusive = true
                         }
                     }
                 }
@@ -215,12 +219,16 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     navController.navigate(Screen.ShipperMyOrders.route)
                 },
 
+                onNavigateToMyOrders = {
+                    navController.navigate(Screen.ShipperMyOrders.route)
+                },
+
                 onLogout = {
-                    authViewModel.logout {
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(0) {
-                                inclusive = true
-                            }
+                    authViewModel.logout()
+
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) {
+                            inclusive = true
                         }
                     }
                 }
