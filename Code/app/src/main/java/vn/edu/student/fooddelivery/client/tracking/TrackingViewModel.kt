@@ -51,4 +51,16 @@ class TrackingViewModel(
             }
         }
     }
+    fun cancelOrder(orderId: String) {
+        viewModelScope.launch {
+            val result = deliveryRepository.cancelRequest(orderId)
+
+            if (result.isFailure) {
+                _uiState.value = UiState.Error(
+                    result.exceptionOrNull()?.message
+                        ?: "Hủy đơn thất bại"
+                )
+            }
+        }
+    }
 }

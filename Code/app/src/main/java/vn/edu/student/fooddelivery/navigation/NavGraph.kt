@@ -112,10 +112,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     navController.navigate(Screen.ClientTracking.route)
                 },
                 onLogout = {
-                    authViewModel.logout()
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) {
-                            inclusive = true
+                    authViewModel.logout {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) {
+                                inclusive = true
+                            }
                         }
                     }
                 }
@@ -224,11 +225,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 },
 
                 onLogout = {
-                    authViewModel.logout()
-
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) {
-                            inclusive = true
+                    authViewModel.logout {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) {
+                                inclusive = true
+                            }
                         }
                     }
                 }
