@@ -24,12 +24,8 @@ import vn.edu.student.fooddelivery.client.createorder.CreateOrderScreen
 import vn.edu.student.fooddelivery.client.createorder.CreateOrderViewModel
 import vn.edu.student.fooddelivery.client.fooddetail.FoodDetailScreen
 import vn.edu.student.fooddelivery.client.fooddetail.FoodDetailViewModel
-import vn.edu.student.fooddelivery.client.history.OrderHistoryScreen
-import vn.edu.student.fooddelivery.client.history.OrderHistoryViewModel
 import vn.edu.student.fooddelivery.client.home.HomeScreen
 import vn.edu.student.fooddelivery.client.home.HomeViewModel
-import vn.edu.student.fooddelivery.client.tracking.TrackingScreen
-import vn.edu.student.fooddelivery.client.tracking.TrackingViewModel
 import vn.edu.student.fooddelivery.domain.model.Role
 import vn.edu.student.fooddelivery.domain.util.UiState
 import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersScreen
@@ -49,30 +45,31 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             }
         }
     )
+
     fun routeForRole(role: Role): String =
         if (role == Role.CLIENT) Screen.ClientHome.route else Screen.ShipperAvailable.route
+
+    fun doLogout() {
+        authViewModel.logout {
+            navController.navigate(Screen.Login.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = Screen.Login.route) {
 
         // ---- AUTH ----
         composable(Screen.Login.route) {
-//            val authViewModel: AuthViewModel = viewModel(
-//                factory = viewModelFactory { initializer { AuthViewModel(app.userRepository) } }
-//            )
             val currentUserState by authViewModel.currentUser.collectAsState()
 
-            // Tự động điều hướng khi: (a) mở app đã có session cũ, hoặc (b) vừa đăng ký xong
             LaunchedEffect(currentUserState) {
                 val state = currentUserState
-
                 if (state is UiState.Success) {
                     val user = state.data
-
                     if (user != null) {
                         navController.navigate(routeForRole(user.role)) {
-                            popUpTo(Screen.Login.route) {
-                                inclusive = true
-                            }
+                            popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     }
                 }
@@ -82,9 +79,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         }
 
         composable(Screen.AccountSwitch.route) {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = viewModelFactory { initializer { AuthViewModel(app.userRepository) } }
-            )
             AccountSwitchScreen(
                 viewModel = authViewModel,
                 onAccountSelected = { role ->
@@ -104,22 +98,12 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             HomeScreen(
                 viewModel = homeViewModel,
                 onNavigateToFoodDetail = { foodId ->
-                    navController.navigate(
-                        Screen.ClientFoodDetail.createRoute(foodId)
-                    )
+                    navController.navigate(Screen.ClientFoodDetail.createRoute(foodId))
                 },
                 onNavigateToTracking = {
                     navController.navigate(Screen.ClientTracking.route)
                 },
-                onLogout = {
-                    authViewModel.logout {
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(0) {
-                                inclusive = true
-                            }
-                        }
-                    }
-                }
+                onLogout = { doLogout() }
             )
         }
 
@@ -166,42 +150,16 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        // ---- CÁC MÀN CHƯA CODE (Người 3 / Người 4) — placeholder tạm ----
+        // ---- CÁC MÀN CHƯA CODE (Người 3) — placeholder tạm ----
         composable(Screen.ClientTracking.route) {
-            val trackingViewModel: TrackingViewModel = viewModel(
-                factory = viewModelFactory {
-                    initializer {
-                        TrackingViewModel(
-                            deliveryRepository = app.deliveryRepository,
-                            userRepository = app.userRepository
-                        )
-                    }
-                }
-            )
-
-            TrackingScreen(
-                viewModel = trackingViewModel
-            )
+            Text("Tracking screen - đang chờ Người 3 code")
         }
         composable(Screen.ClientHistory.route) {
-
-            val orderHistoryViewModel: OrderHistoryViewModel = viewModel(
-                factory = viewModelFactory {
-                    initializer {
-                        OrderHistoryViewModel(
-                            deliveryRepository = app.deliveryRepository,
-                            userRepository = app.userRepository
-                        )
-                    }
-                }
-            )
-
-            OrderHistoryScreen(
-                viewModel = orderHistoryViewModel
-            )
+            Text("History screen - đang chờ Người 3 code")
         }
-        composable(Screen.ShipperAvailable.route) {
 
+        // ---- SHIPPER ----
+        composable(Screen.ShipperAvailable.route) {
             val availableOrdersViewModel: AvailableOrdersViewModel = viewModel(
                 factory = viewModelFactory {
                     initializer {
@@ -215,28 +173,17 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
             AvailableOrdersScreen(
                 viewModel = availableOrdersViewModel,
-
                 onOrderAccepted = {
                     navController.navigate(Screen.ShipperMyOrders.route)
                 },
-
                 onNavigateToMyOrders = {
                     navController.navigate(Screen.ShipperMyOrders.route)
                 },
-
-                onLogout = {
-                    authViewModel.logout {
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(0) {
-                                inclusive = true
-                            }
-                        }
-                    }
-                }
+                onLogout = { doLogout() }
             )
         }
-        composable(Screen.ShipperMyOrders.route) {
 
+        composable(Screen.ShipperMyOrders.route) {
             val myOrdersViewModel: MyOrdersViewModel = viewModel(
                 factory = viewModelFactory {
                     initializer {
@@ -251,19 +198,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             MyOrdersScreen(
                 viewModel = myOrdersViewModel,
                 onOrderClick = { orderId ->
-                    navController.navigate(
-                        Screen.ShipperOrderDetail.createRoute(orderId)
-                    )
+                    navController.navigate(Screen.ShipperOrderDetail.createRoute(orderId))
                 }
             )
         }
+
         composable(
             route = Screen.ShipperOrderDetail.route,
-            arguments = listOf(
-                navArgument("orderId") {
-                    type = NavType.StringType
-                }
-            )
+            arguments = listOf(navArgument("orderId") { type = NavType.StringType })
         ) {
             val orderDetailViewModel: ShipperOrderDetailViewModel = viewModel(
                 factory = viewModelFactory {
@@ -284,9 +226,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             ShipperOrderDetailScreen(
                 viewModel = orderDetailViewModel,
                 shipperId = currentUser?.id ?: "",
-                onNavigateBack = {
-                    navController.popBackStack()
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
