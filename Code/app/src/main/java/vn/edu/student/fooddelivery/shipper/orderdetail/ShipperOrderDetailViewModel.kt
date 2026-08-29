@@ -7,13 +7,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import vn.edu.student.fooddelivery.data.repository.DeliveryRepository
+import vn.edu.student.fooddelivery.data.repository.FoodRepository
 import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
+import vn.edu.student.fooddelivery.domain.model.FoodItem
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
 import vn.edu.student.fooddelivery.domain.model.StatusLog
 
 data class ShipperOrderDetailUiState(
     val isLoading: Boolean = true,
     val request: DeliveryRequest? = null,
+    val foodItem: FoodItem? = null,
     val statusHistory: List<StatusLog> = emptyList(),
     val isUpdating: Boolean = false,
     val error: String? = null
@@ -21,6 +24,7 @@ data class ShipperOrderDetailUiState(
 
 class ShipperOrderDetailViewModel(
     private val repository: DeliveryRepository,
+    private val foodRepository: FoodRepository,
     private val requestId: String
 ) : ViewModel() {
 
@@ -46,6 +50,7 @@ class ShipperOrderDetailViewModel(
 
             requestResult
                 .onSuccess { request ->
+                    val food = foodRepository.getFoodItemById(request.foodItemId)
                     val historyResult =
                         repository.getStatusHistory(requestId)
 

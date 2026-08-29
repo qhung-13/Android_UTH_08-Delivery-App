@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
@@ -23,7 +24,6 @@ import vn.edu.student.fooddelivery.ui.components.LoadingIndicator
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
 @Composable
 fun ShipperOrderDetailScreen(
     viewModel: ShipperOrderDetailViewModel,
