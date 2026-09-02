@@ -3,6 +3,7 @@ package vn.edu.student.fooddelivery.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -17,13 +18,21 @@ fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    loading: Boolean = false
 ) {
     Button(
         onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth().height(48.dp)
+        enabled = enabled && !loading,
+        modifier = modifier.fillMaxWidth().height(52.dp)
     ) {
-        Text(text)
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.height(22.dp),
+                strokeWidth = 2.dp
+            )
+        } else {
+            Text(text)
+        }
     }
 }
