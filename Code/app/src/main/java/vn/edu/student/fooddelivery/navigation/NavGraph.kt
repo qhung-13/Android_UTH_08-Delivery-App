@@ -1,12 +1,12 @@
 package vn.edu.student.fooddelivery.navigation
 
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -24,129 +24,242 @@ import vn.edu.student.fooddelivery.client.createorder.CreateOrderScreen
 import vn.edu.student.fooddelivery.client.createorder.CreateOrderViewModel
 import vn.edu.student.fooddelivery.client.fooddetail.FoodDetailScreen
 import vn.edu.student.fooddelivery.client.fooddetail.FoodDetailViewModel
+import vn.edu.student.fooddelivery.client.history.OrderHistoryScreen
+import vn.edu.student.fooddelivery.client.history.OrderHistoryViewModel
 import vn.edu.student.fooddelivery.client.home.HomeScreen
 import vn.edu.student.fooddelivery.client.home.HomeViewModel
+import vn.edu.student.fooddelivery.client.tracking.TrackingScreen
+import vn.edu.student.fooddelivery.client.tracking.TrackingViewModel
 import vn.edu.student.fooddelivery.domain.model.Role
+import vn.edu.student.fooddelivery.domain.model.User
 import vn.edu.student.fooddelivery.domain.util.UiState
+import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersScreen
+import vn.edu.student.fooddelivery.shipper.availablelist.AvailableOrdersViewModel
+import vn.edu.student.fooddelivery.shipper.myorders.MyOrdersScreen
+import vn.edu.student.fooddelivery.shipper.myorders.MyOrdersViewModel
+import vn.edu.student.fooddelivery.shipper.orderdetail.ShipperOrderDetailScreen
+import vn.edu.student.fooddelivery.shipper.orderdetail.ShipperOrderDetailViewModel
+import vn.edu.student.fooddelivery.ui.components.ErrorState
+import vn.edu.student.fooddelivery.ui.components.LoadingIndicator
 
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
     val app = LocalContext.current.applicationContext as FoodDeliveryApp
+    val authViewModel: AuthViewModel = viewModel(
+        factory = viewModelFactory { initializer { AuthViewModel(app.userRepository) } }
+    )
+    val currentUserState by authViewModel.currentUser.collectAsStateWithLifecycle()
 
-    fun routeForRole(role: Role): String =
+    fun roleRoute(role: Role): String =
         if (role == Role.CLIENT) Screen.ClientHome.route else Screen.ShipperAvailable.route
 
-    NavHost(navController = navController, startDestination = Screen.Login.route) {
+    fun navigateRoot(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.id) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
 
-        // ---- AUTH ----
+    fun navigateTab(route: String) {
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
+    fun openAccounts() {
+        navController.navigate(Screen.AccountSwitch.route) { launchSingleTop = true }
+    }
+
+    NavHost(navController, startDestination = Screen.Login.route) {
         composable(Screen.Login.route) {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = viewModelFactory { initializer { AuthViewModel(app.userRepository) } }
-            )
-            val currentUserState by authViewModel.currentUser.collectAsState()
-
-            // Tự động điều hướng khi: (a) mở app đã có session cũ, hoặc (b) vừa đăng ký xong
             LaunchedEffect(currentUserState) {
-                val state = currentUserState
-                if (state is UiState.Success && state.data != null) {
-                    navController.navigate(routeForRole(state.data!!.role)) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                    }
-                }
+                val user = (currentUserState as? UiState.Success<User?>)?.data
+                if (user != null) navigateRoot(roleRoute(user.role))
             }
-
-            LoginScreen(viewModel = authViewModel, onRegisterSuccess = {})
+            LoginScreen(authViewModel) { navController.navigate(Screen.AccountSwitch.route) }
         }
 
         composable(Screen.AccountSwitch.route) {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = viewModelFactory { initializer { AuthViewModel(app.userRepository) } }
-            )
             AccountSwitchScreen(
                 viewModel = authViewModel,
-                onAccountSelected = { role ->
-                    navController.navigate(routeForRole(role)) { popUpTo(0) }
-                },
+                onAccountSelected = { navigateRoot(roleRoute(it)) },
                 onCreateNewAccount = {
-                    navController.navigate(Screen.Login.route) { popUpTo(0) }
+                    authViewModel.logout()
+                    navigateRoot(Screen.Login.route)
+                },
+                onLogout = {
+                    authViewModel.logout()
+                    navigateRoot(Screen.Login.route)
                 }
             )
         }
 
-        // ---- CLIENT ----
         composable(Screen.ClientHome.route) {
-            val homeViewModel: HomeViewModel = viewModel(
-                factory = viewModelFactory { initializer { HomeViewModel(app.foodRepository) } }
-            )
-            HomeScreen(
-                viewModel = homeViewModel,
-                onNavigateToFoodDetail = { foodId ->
-                    navController.navigate(Screen.ClientFoodDetail.createRoute(foodId))
-                }
-            )
+            RoleGate(currentUserState, Role.CLIENT, { navigateRoot(Screen.Login.route) }) {
+                val vm: HomeViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { HomeViewModel(app.foodRepository, app.userRepository) }
+                    }
+                )
+                HomeScreen(
+                    vm,
+                    onNavigateToFoodDetail = { navController.navigate(Screen.ClientFoodDetail.createRoute(it)) },
+                    onNavigateToTracking = { navigateTab(Screen.ClientTracking.route) },
+                    onNavigateToHistory = { navigateTab(Screen.ClientHistory.route) },
+                    onAccount = ::openAccounts
+                )
+            }
         }
 
         composable(
-            route = Screen.ClientFoodDetail.route,
+            Screen.ClientFoodDetail.route,
             arguments = listOf(navArgument("foodId") { type = NavType.StringType })
         ) {
-            val detailViewModel: FoodDetailViewModel = viewModel(
-                factory = viewModelFactory {
-                    initializer { FoodDetailViewModel(createSavedStateHandle(), app.foodRepository) }
-                }
-            )
-            FoodDetailScreen(
-                viewModel = detailViewModel,
-                onNavigateToCreateOrder = { foodId ->
-                    navController.navigate(Screen.ClientCreateOrder.createRoute(foodId))
-                }
-            )
+            RoleGate(currentUserState, Role.CLIENT, { navigateRoot(Screen.Login.route) }) {
+                val vm: FoodDetailViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { FoodDetailViewModel(createSavedStateHandle(), app.foodRepository) }
+                    }
+                )
+                FoodDetailScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToCreateOrder = { navController.navigate(Screen.ClientCreateOrder.createRoute(it)) }
+                )
+            }
         }
 
         composable(
-            route = Screen.ClientCreateOrder.route,
+            Screen.ClientCreateOrder.route,
             arguments = listOf(navArgument("foodId") { type = NavType.StringType })
         ) {
-            val createOrderViewModel: CreateOrderViewModel = viewModel(
-                factory = viewModelFactory {
-                    initializer {
-                        CreateOrderViewModel(
-                            createSavedStateHandle(),
-                            app.foodRepository,
-                            app.deliveryRepository,
-                            app.userRepository
-                        )
+            RoleGate(currentUserState, Role.CLIENT, { navigateRoot(Screen.Login.route) }) {
+                val vm: CreateOrderViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer {
+                            CreateOrderViewModel(
+                                createSavedStateHandle(),
+                                app.foodRepository,
+                                app.deliveryRepository,
+                                app.userRepository
+                            )
+                        }
                     }
-                }
-            )
-            CreateOrderScreen(
-                viewModel = createOrderViewModel,
-                onNavigateBackOrTracking = {
-                    navController.navigate(Screen.ClientTracking.route) {
-                        popUpTo(Screen.ClientHome.route)
-                    }
-                }
-            )
+                )
+                CreateOrderScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                    onSuccess = { navigateRoot(Screen.ClientTracking.route) }
+                )
+            }
         }
 
-        // ---- CÁC MÀN CHƯA CODE (Người 3 / Người 4) — placeholder tạm ----
         composable(Screen.ClientTracking.route) {
-            Text("Tracking screen - đang chờ Người 3 code")
+            RoleGate(currentUserState, Role.CLIENT, { navigateRoot(Screen.Login.route) }) {
+                val vm: TrackingViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { TrackingViewModel(app.deliveryRepository, app.userRepository) }
+                    }
+                )
+                TrackingScreen(
+                    vm,
+                    onNavigateHome = { navigateTab(Screen.ClientHome.route) },
+                    onNavigateHistory = { navigateTab(Screen.ClientHistory.route) },
+                    onAccount = ::openAccounts
+                )
+            }
         }
+
         composable(Screen.ClientHistory.route) {
-            Text("History screen - đang chờ Người 3 code")
+            RoleGate(currentUserState, Role.CLIENT, { navigateRoot(Screen.Login.route) }) {
+                val vm: OrderHistoryViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { OrderHistoryViewModel(app.deliveryRepository, app.userRepository) }
+                    }
+                )
+                OrderHistoryScreen(
+                    vm,
+                    onNavigateHome = { navigateTab(Screen.ClientHome.route) },
+                    onNavigateTracking = { navigateTab(Screen.ClientTracking.route) },
+                    onAccount = ::openAccounts
+                )
+            }
         }
+
         composable(Screen.ShipperAvailable.route) {
-            Text("Shipper Available screen - đang chờ Người 3 code")
+            RoleGate(currentUserState, Role.SHIPPER, { navigateRoot(Screen.Login.route) }) {
+                val vm: AvailableOrdersViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { AvailableOrdersViewModel(app.deliveryRepository, app.userRepository) }
+                    }
+                )
+                AvailableOrdersScreen(
+                    vm,
+                    onOrderAccepted = { navigateTab(Screen.ShipperMyOrders.route) },
+                    onNavigateToMyOrders = { navigateTab(Screen.ShipperMyOrders.route) },
+                    onAccount = ::openAccounts
+                )
+            }
         }
+
         composable(Screen.ShipperMyOrders.route) {
-            Text("Shipper My Orders screen - đang chờ Người 3 code")
+            RoleGate(currentUserState, Role.SHIPPER, { navigateRoot(Screen.Login.route) }) {
+                val vm: MyOrdersViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { MyOrdersViewModel(app.deliveryRepository, app.userRepository) }
+                    }
+                )
+                MyOrdersScreen(
+                    vm,
+                    onOrderClick = { navController.navigate(Screen.ShipperOrderDetail.createRoute(it)) },
+                    onNavigateToAvailable = { navigateTab(Screen.ShipperAvailable.route) },
+                    onAccount = ::openAccounts
+                )
+            }
         }
+
         composable(
-            route = Screen.ShipperOrderDetail.route,
+            Screen.ShipperOrderDetail.route,
             arguments = listOf(navArgument("orderId") { type = NavType.StringType })
         ) {
-            Text("Shipper Order Detail screen - đang chờ Người 4 code")
+            RoleGate(currentUserState, Role.SHIPPER, { navigateRoot(Screen.Login.route) }) {
+                val vm: ShipperOrderDetailViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer {
+                            val savedStateHandle = createSavedStateHandle()
+                            ShipperOrderDetailViewModel(
+                                app.deliveryRepository,
+                                app.foodRepository,
+                                app.userRepository,
+                                savedStateHandle.get<String>("orderId").orEmpty()
+                            )
+                        }
+                    }
+                )
+                ShipperOrderDetailScreen(vm, onBack = { navController.popBackStack() })
+            }
+        }
+    }
+}
+
+@Composable
+private fun RoleGate(
+    state: UiState<User?>,
+    requiredRole: Role,
+    onDenied: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    when (state) {
+        UiState.Loading -> LoadingIndicator()
+        UiState.Empty -> {
+            LaunchedEffect(Unit) { onDenied() }
+            LoadingIndicator()
+        }
+        is UiState.Error -> ErrorState(state.message)
+        is UiState.Success -> {
+            if (state.data?.role == requiredRole) content()
+            else {
+                LaunchedEffect(state.data?.id, requiredRole) { onDenied() }
+                LoadingIndicator(Modifier)
+            }
         }
     }
 }
