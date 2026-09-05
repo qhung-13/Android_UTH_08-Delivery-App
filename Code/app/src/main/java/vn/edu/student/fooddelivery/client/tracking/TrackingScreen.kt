@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
+import vn.edu.student.fooddelivery.domain.model.OrderStatus
 import vn.edu.student.fooddelivery.ui.components.StatusBadge
 import vn.edu.student.fooddelivery.ui.components.UiStateContent
 
@@ -24,12 +25,20 @@ fun TrackingScreen(
         emptyMessage = "Chưa có đơn hàng nào đang giao",
         onRetry = { viewModel.loadData() }
     ) { requests ->
-        OrderTrackingList(requests = requests)
+        OrderTrackingList(
+            requests = requests,
+            onCancelOrder = { orderId ->
+                viewModel.cancelOrder(orderId)
+            }
+        )
     }
 }
 
 @Composable
-fun OrderTrackingList(requests: List<DeliveryRequest>) {
+fun OrderTrackingList(
+    requests: List<DeliveryRequest>,
+    onCancelOrder: (String) -> Unit
+) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -37,17 +46,50 @@ fun OrderTrackingList(requests: List<DeliveryRequest>) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(requests) { order ->
+
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(16.dp)
                 ) {
-                    Text(text = "Đơn #${order.id}")
-                    StatusBadge(status = order.status)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Đơn #${order.id}"
+                        )
+
+                        StatusBadge(
+                            status = order.status
+                        )
+                    }
+
+                    // Chỉ cho phép hủy khi PENDING hoặc ACCEPTED
+                    if (
+                        order.status == OrderStatus.PENDING ||
+                        order.status == OrderStatus.ACCEPTED
+                    ) {
+                        Spacer(
+                            modifier = Modifier.height(12.dp)
+                        )
+
+                        Button(
+                            onClick = {
+                                onCancelOrder(order.id)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Hủy đơn")
+                        }
+                    }
                 }
             }
         }

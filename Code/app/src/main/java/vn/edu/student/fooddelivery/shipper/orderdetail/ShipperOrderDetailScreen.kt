@@ -15,15 +15,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
 import vn.edu.student.fooddelivery.ui.components.ErrorState
 import vn.edu.student.fooddelivery.ui.components.LoadingIndicator
-
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 @Composable
 fun ShipperOrderDetailScreen(
     viewModel: ShipperOrderDetailViewModel,
+    shipperId: String,
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,8 +95,7 @@ fun ShipperOrderDetailScreen(
                                 text = "Nhận đơn",
                                 enabled = !uiState.isUpdating,
                                 onClick = {
-                                    // Phần Accept sẽ được xử lý
-                                    // từ màn hình danh sách Shipper.
+                                    viewModel.acceptOrder(shipperId)
                                 }
                             )
                         }
@@ -184,7 +187,14 @@ fun ShipperOrderDetailScreen(
                                 modifier = Modifier.padding(12.dp)
                             ) {
                                 Text("Trạng thái: ${log.status}")
-                                Text("Thời gian: ${log.timestamp}")
+                                Text(
+                                    "Thời gian: ${
+                                        SimpleDateFormat(
+                                            "dd/MM/yyyy HH:mm:ss",
+                                            Locale.getDefault()
+                                        ).format(Date(log.timestamp))
+                                    }"
+                                )
                             }
                         }
                     }
