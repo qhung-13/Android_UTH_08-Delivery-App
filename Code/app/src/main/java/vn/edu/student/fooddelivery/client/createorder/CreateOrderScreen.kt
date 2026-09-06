@@ -1,6 +1,5 @@
 package vn.edu.student.fooddelivery.client.createorder
 
-import vn.edu.student.fooddelivery.ui.theme.Spacing
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +25,7 @@ import vn.edu.student.fooddelivery.ui.components.InfoRow
 import vn.edu.student.fooddelivery.ui.components.PrimaryButton
 import vn.edu.student.fooddelivery.ui.components.UiStateContent
 import vn.edu.student.fooddelivery.ui.formatCurrency
+import vn.edu.student.fooddelivery.ui.theme.Spacing
 
 @Composable
 fun CreateOrderScreen(viewModel: CreateOrderViewModel, onBack: () -> Unit, onSuccess: () -> Unit) {

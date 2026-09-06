@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import vn.edu.student.fooddelivery.R
 
 @Composable
 fun ErrorState(
@@ -36,7 +38,7 @@ fun ErrorState(
             )
             if (onRetry != null) {
                 Button(onClick = onRetry) {
-                    Text("Thử lại")
+                    Text(stringResource(R.string.retry))
                 }
             }
         }

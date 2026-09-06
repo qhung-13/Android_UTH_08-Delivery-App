@@ -13,70 +13,104 @@ import vn.edu.student.fooddelivery.data.repository.UserRepository
 import vn.edu.student.fooddelivery.domain.model.Role
 import vn.edu.student.fooddelivery.domain.model.User
 import vn.edu.student.fooddelivery.domain.util.UiState
+import vn.edu.student.fooddelivery.domain.util.runSuspendCatching
 import vn.edu.student.fooddelivery.domain.validation.InputValidator
 import java.util.UUID
 
-class AuthViewModel(
-    private val userRepository: UserRepository
-) : ViewModel() {
+data class AuthUiState(
+    val accounts: List<User> = emptyList(),
+    val isSubmitting: Boolean = false,
+    val switchingAccountId: String? = null,
+    val error: String? = null
+)
 
+class AuthViewModel(private val userRepository: UserRepository) : ViewModel() {
     private val _currentUser = MutableStateFlow<UiState<User?>>(UiState.Loading)
     val currentUser: StateFlow<UiState<User?>> = _currentUser.asStateFlow()
 
-    private val _registerError = MutableStateFlow<String?>(null)
-    val registerError: StateFlow<String?> = _registerError.asStateFlow()
+    private val _uiState = MutableStateFlow(AuthUiState())
+    val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _allAccounts = MutableStateFlow<List<User>>(emptyList())
-    val allAccounts: StateFlow<List<User>> = _allAccounts.asStateFlow()
+    init {
+        userRepository.getCurrentUser()
+            .onEach { _currentUser.value = UiState.Success(it) }
+            .catch { error -> _currentUser.value = UiState.Error(error.userMessage()) }
+            .launchIn(viewModelScope)
+        refreshAccounts()
+    }
 
     fun refreshAccounts() {
         viewModelScope.launch {
-            _allAccounts.value = userRepository.getAllUsers()
+            runSuspendCatching { userRepository.getAllUsers() }
+                .onSuccess { accounts -> _uiState.value = _uiState.value.copy(accounts = accounts) }
+                .onFailure { error -> _uiState.value = _uiState.value.copy(error = error.userMessage()) }
         }
-    }
-
-    init {
-        refreshAccounts()
-        userRepository.getCurrentUser()
-            .onEach { user -> _currentUser.value = UiState.Success(user) }
-            .catch { e -> _currentUser.value = UiState.Error(e.message ?: "Lỗi tải phiên đăng nhập") }
-            .launchIn(viewModelScope)
     }
 
     fun register(name: String, phone: String, role: Role) {
-        _registerError.value = null
-
-        if (!InputValidator.isValidName(name)) {
-            _registerError.value = "Tên không được để trống"
-            return
+        if (_uiState.value.isSubmitting) return
+        val validationError = when {
+            !InputValidator.isValidName(name) -> "Tên không được để trống"
+            !InputValidator.isValidPhone(phone) -> "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0"
+            else -> null
         }
-        if (!InputValidator.isValidPhone(phone)) {
-            _registerError.value = "Số điện thoại không hợp lệ (VD: 0901234567)"
+        if (validationError != null) {
+            _uiState.value = _uiState.value.copy(error = validationError)
             return
         }
 
         viewModelScope.launch {
-            val newUser = User(
+            _uiState.value = _uiState.value.copy(isSubmitting = true, error = null)
+            val user = User(
                 id = UUID.randomUUID().toString(),
                 name = name.trim(),
                 phone = phone.trim(),
                 role = role
             )
-            userRepository.createUser(newUser)
-                .onSuccess { userRepository.setCurrentUser(newUser.id) }
-                .onFailure { e -> _registerError.value = e.message ?: "Đăng ký thất bại" }
+            userRepository.createUser(user)
+                .onSuccess {
+                    runSuspendCatching { userRepository.setCurrentUser(user.id) }
+                        .onSuccess {
+                            _currentUser.value = UiState.Success(user)
+                            refreshAccounts()
+                        }
+                        .onFailure { error -> _uiState.value = _uiState.value.copy(error = error.userMessage()) }
+                }
+                .onFailure { error -> _uiState.value = _uiState.value.copy(error = error.userMessage()) }
+            _uiState.value = _uiState.value.copy(isSubmitting = false)
         }
     }
 
-    fun switchAccount(userId: String) {
+    fun switchAccount(userId: String, onSelected: (Role) -> Unit = {}) {
+        if (_uiState.value.switchingAccountId != null) return
         viewModelScope.launch {
-            userRepository.setCurrentUser(userId)
+            _uiState.value = _uiState.value.copy(switchingAccountId = userId, error = null)
+            val account = _uiState.value.accounts.firstOrNull { it.id == userId }
+            if (account == null) {
+                _uiState.value = _uiState.value.copy(error = "Tài khoản không còn tồn tại")
+            } else {
+                runSuspendCatching { userRepository.setCurrentUser(userId) }
+                    .onSuccess {
+                        _currentUser.value = UiState.Success(account)
+                        onSelected(account.role)
+                    }
+                    .onFailure { error -> _uiState.value = _uiState.value.copy(error = error.userMessage()) }
+            }
+            _uiState.value = _uiState.value.copy(switchingAccountId = null)
         }
     }
 
     fun logout() {
+        _currentUser.value = UiState.Success(null)
         viewModelScope.launch {
-            userRepository.clearCurrentUser()
+            runSuspendCatching { userRepository.clearCurrentUser() }
+                .onFailure { error -> _uiState.value = _uiState.value.copy(error = error.userMessage()) }
         }
     }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
 }
+
+private fun Throwable.userMessage(): String = message ?: "Đã có lỗi xảy ra"

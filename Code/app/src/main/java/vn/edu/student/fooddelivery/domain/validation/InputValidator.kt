@@ -6,7 +6,7 @@ object InputValidator {
         name.isNotBlank()
 
     fun isValidPhone(phone: String): Boolean =
-        phone.matches(Regex("^0\\d{9}$"))
+        phone.trim().matches(Regex("^0\\d{9}$"))
 
     fun isValidAddress(address: String): Boolean =
         address.trim().length >= 5

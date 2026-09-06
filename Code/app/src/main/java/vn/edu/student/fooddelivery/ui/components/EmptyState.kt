@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun EmptyState(
-    message: String = "Chưa có dữ liệu",
+    message: String,
     modifier: Modifier = Modifier
 ) {
     Box(

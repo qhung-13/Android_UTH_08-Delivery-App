@@ -8,7 +8,7 @@ import vn.edu.student.fooddelivery.domain.util.UiState
 fun <T> UiStateContent(
     state: UiState<T>,
     modifier: Modifier = Modifier,
-    emptyMessage: String = "Chưa có dữ liệu",
+    emptyMessage: String,
     onRetry: (() -> Unit)? = null,
     content: @Composable (T) -> Unit
 ) {

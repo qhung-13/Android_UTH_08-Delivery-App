@@ -9,18 +9,20 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "session_prefs")
 
-class SessionManager(private val context: Context) {
+class SessionManager(context: Context) {
+
+    private val appContext = context.applicationContext
 
     private val currentUserIdKey = stringPreferencesKey("current_user_id")
 
     val currentUserIdFlow: Flow<String?> =
-        context.dataStore.data.map { prefs -> prefs[currentUserIdKey] }
+        appContext.dataStore.data.map { prefs -> prefs[currentUserIdKey] }
 
     suspend fun setCurrentUserId(userId: String) {
-        context.dataStore.edit { prefs -> prefs[currentUserIdKey] = userId }
+        appContext.dataStore.edit { prefs -> prefs[currentUserIdKey] = userId }
     }
 
     suspend fun clearCurrentUser() {
-        context.dataStore.edit { prefs -> prefs.remove(currentUserIdKey) }
+        appContext.dataStore.edit { prefs -> prefs.remove(currentUserIdKey) }
     }
 }

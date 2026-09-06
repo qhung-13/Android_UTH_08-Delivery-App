@@ -2,78 +2,73 @@ package vn.edu.student.fooddelivery.shipper.availablelist
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
-import vn.edu.student.fooddelivery.ui.components.PrimaryButton
-import vn.edu.student.fooddelivery.ui.components.StatusBadge
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import vn.edu.student.fooddelivery.R
+import vn.edu.student.fooddelivery.ui.components.BottomDestination
+import vn.edu.student.fooddelivery.ui.components.DeliveryBottomBar
+import vn.edu.student.fooddelivery.ui.components.DeliveryTopBar
+import vn.edu.student.fooddelivery.ui.components.OrderSummaryCard
 import vn.edu.student.fooddelivery.ui.components.UiStateContent
+import vn.edu.student.fooddelivery.ui.theme.Spacing
 
 @Composable
 fun AvailableOrdersScreen(
-    viewModel: AvailableOrdersViewModel
+    viewModel: AvailableOrdersViewModel,
+    onOrderAccepted: () -> Unit,
+    onNavigateToMyOrders: () -> Unit,
+    onAccount: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-
-    UiStateContent(
-        state = uiState,
-        emptyMessage = "Hiện chưa có đơn hàng mới",
-        onRetry = { viewModel.loadData() }
-    ) { requests ->
-        AvailableOrdersList(
-            requests = requests,
-            onAccept = { orderId -> viewModel.acceptRequest(orderId) }
-        )
-    }
-}
-
-@Composable
-fun AvailableOrdersList(
-    requests: List<DeliveryRequest>,
-    onAccept: (String) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(requests) { order ->
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = "Mã đơn: #${order.id}")
-                        StatusBadge(status = order.status)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    PrimaryButton(
-                        text = "Nhận đơn",
-                        onClick = { onAccept(order.id) }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    Scaffold(
+        topBar = { DeliveryTopBar(stringResource(R.string.available_title), accountLabel = stringResource(R.string.account), onAccount = onAccount) },
+        bottomBar = {
+            DeliveryBottomBar(
+                listOf(
+                    BottomDestination(stringResource(R.string.nav_available), "＋", true) {},
+                    BottomDestination(stringResource(R.string.nav_my_orders), "☷", false, onNavigateToMyOrders)
+                )
+            )
+        }
+    ) { padding ->
+        UiStateContent(
+            state = state,
+            modifier = Modifier.padding(padding),
+            emptyMessage = stringResource(R.string.empty_available),
+            onRetry = viewModel::retry
+        ) { data ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                data.actionError?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth().padding(Spacing.large)
                     )
+                }
+                LazyColumn(
+                    contentPadding = PaddingValues(Spacing.large),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.large)
+                ) {
+                    items(data.orders, key = { it.id }) { order ->
+                        OrderSummaryCard(
+                            order = order,
+                            actionLabel = stringResource(R.string.accept_order),
+                            actionLoading = data.acceptingOrderId == order.id,
+                            onAction = { viewModel.accept(order.id, onOrderAccepted) }
+                        )
+                    }
                 }
             }
         }
