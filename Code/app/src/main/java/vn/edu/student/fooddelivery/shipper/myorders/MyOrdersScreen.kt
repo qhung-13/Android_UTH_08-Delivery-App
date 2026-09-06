@@ -1,102 +1,102 @@
 package vn.edu.student.fooddelivery.shipper.myorders
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import vn.edu.student.fooddelivery.R
 import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
-import vn.edu.student.fooddelivery.ui.components.PrimaryButton
-import vn.edu.student.fooddelivery.ui.components.StatusBadge
+import vn.edu.student.fooddelivery.ui.components.BottomDestination
+import vn.edu.student.fooddelivery.ui.components.DeliveryBottomBar
+import vn.edu.student.fooddelivery.ui.components.DeliveryTopBar
+import vn.edu.student.fooddelivery.ui.components.OrderSummaryCard
 import vn.edu.student.fooddelivery.ui.components.UiStateContent
+import vn.edu.student.fooddelivery.ui.theme.Spacing
 
 @Composable
 fun MyOrdersScreen(
     viewModel: MyOrdersViewModel,
     onOrderClick: (String) -> Unit,
+    onNavigateToAvailable: () -> Unit,
+    onAccount: () -> Unit
 ) {
-
-    val uiState by viewModel.uiState.collectAsState()
-
-    UiStateContent(
-        state = uiState,
-        emptyMessage = "Bạn chưa nhận đơn hàng nào",
-        onRetry = { viewModel.loadData() }
-    ) { myOrdersList ->
-        MyOrdersList(
-            myOrdersList = myOrdersList,
-            onUpdateStatus = { orderId, newStatus ->
-                viewModel.updateStatus(orderId, newStatus)
-            },
-            onOrderClick = onOrderClick
-        )
-    }
-}
-
-@Composable
-fun MyOrdersList(
-    myOrdersList: List<DeliveryRequest>,
-    onUpdateStatus: (String, OrderStatus) -> Unit,
-    onOrderClick: (String) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(myOrdersList) { order ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        onOrderClick(order.id)
-                    }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    Scaffold(
+        topBar = { DeliveryTopBar(stringResource(R.string.my_orders_title), accountLabel = stringResource(R.string.account), onAccount = onAccount) },
+        bottomBar = {
+            DeliveryBottomBar(
+                listOf(
+                    BottomDestination(stringResource(R.string.nav_available), "＋", false, onNavigateToAvailable),
+                    BottomDestination(stringResource(R.string.nav_my_orders), "☷", true) {}
+                )
+            )
+        }
+    ) { padding ->
+        UiStateContent(
+            state = state,
+            modifier = Modifier.padding(padding),
+            emptyMessage = stringResource(R.string.empty_my_orders),
+            onRetry = viewModel::retry
+        ) { data ->
+            val active = data.orders.filterNot { it.status.isTerminal }
+            val completed = data.orders.filter { it.status.isTerminal }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(Spacing.large),
+                verticalArrangement = Arrangement.spacedBy(Spacing.large)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = "Mã đơn: #${order.id}")
-                        StatusBadge(status = order.status)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val (buttonText, nextStatus) = when (order.status) {
-                        OrderStatus.ACCEPTED -> "Bắt đầu lấy hàng" to OrderStatus.PICKED_UP
-                        OrderStatus.PICKED_UP -> "Bắt đầu giao hàng" to OrderStatus.IN_TRANSIT
-                        OrderStatus.IN_TRANSIT -> "Xác nhận đã giao" to OrderStatus.DELIVERED
-                        else -> null to null
-                    }
-
-                    if (buttonText != null && nextStatus != null) {
-                        PrimaryButton(
-                            text = buttonText,
-                            onClick = { onUpdateStatus(order.id, nextStatus) }
+                data.actionError?.let { message ->
+                    item { Text(message, color = MaterialTheme.colorScheme.error) }
+                }
+                if (active.isNotEmpty()) {
+                    item { SectionTitle(stringResource(R.string.active_orders), active.size) }
+                    items(active, key = DeliveryRequest::id) { order ->
+                        val action = nextAction(order.status)
+                        OrderSummaryCard(
+                            order = order,
+                            actionLabel = action?.first,
+                            actionLoading = data.updatingOrderId == order.id,
+                            onAction = action?.second?.let { status -> ({ viewModel.updateStatus(order.id, status) }) },
+                            onClick = { onOrderClick(order.id) }
                         )
+                    }
+                }
+                if (completed.isNotEmpty()) {
+                    item { SectionTitle(stringResource(R.string.completed_orders), completed.size) }
+                    items(completed, key = DeliveryRequest::id) { order ->
+                        OrderSummaryCard(order = order, onClick = { onOrderClick(order.id) })
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun nextAction(status: OrderStatus): Pair<String, OrderStatus>? = when (status) {
+    OrderStatus.ACCEPTED -> stringResource(R.string.start_pickup) to OrderStatus.PICKED_UP
+    OrderStatus.PICKED_UP -> stringResource(R.string.start_delivery) to OrderStatus.IN_TRANSIT
+    OrderStatus.IN_TRANSIT -> stringResource(R.string.mark_delivered) to OrderStatus.DELIVERED
+    else -> null
+}
+
+@Composable
+private fun SectionTitle(title: String, count: Int) {
+    Text("$title · $count", style = MaterialTheme.typography.titleLarge, modifier = Modifier.fillMaxWidth())
+}
+
+private val OrderStatus.isTerminal: Boolean
+    get() = this == OrderStatus.DELIVERED || this == OrderStatus.CANCELLED

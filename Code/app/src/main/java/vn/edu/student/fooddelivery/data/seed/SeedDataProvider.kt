@@ -1,7 +1,7 @@
 package vn.edu.student.fooddelivery.data.seed
 
-import vn.edu.student.fooddelivery.data.local.dao.FoodItemDao
-import vn.edu.student.fooddelivery.data.local.dao.RestaurantDao
+import androidx.room.withTransaction
+import vn.edu.student.fooddelivery.data.local.AppDatabase
 import vn.edu.student.fooddelivery.data.local.entity.FoodItemEntity
 import vn.edu.student.fooddelivery.data.local.entity.RestaurantEntity
 
@@ -33,12 +33,12 @@ object SeedDataProvider {
         FoodItemEntity("f12", "r4", "Hồng Trà Sữa Kem Cheese", 45_000.0, 500, "")
     )
 
-    suspend fun seedIfEmpty(restaurantDao: RestaurantDao, foodItemDao: FoodItemDao) {
-        if (restaurantDao.count() == 0) {
-            restaurantDao.insertAll(restaurants)
-        }
-        if (foodItemDao.count() == 0) {
-            foodItemDao.insertAll(foodItems)
+    suspend fun seedIfEmpty(database: AppDatabase) {
+        database.withTransaction {
+            val restaurantDao = database.restaurantDao()
+            val foodItemDao = database.foodItemDao()
+            if (restaurantDao.count() == 0) restaurantDao.insertAll(restaurants)
+            if (foodItemDao.count() == 0) foodItemDao.insertAll(foodItems)
         }
     }
 }

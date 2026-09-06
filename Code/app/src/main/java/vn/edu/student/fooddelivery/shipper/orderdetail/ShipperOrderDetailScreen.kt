@@ -1,203 +1,67 @@
 package vn.edu.student.fooddelivery.shipper.orderdetail
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import vn.edu.student.fooddelivery.R
 import vn.edu.student.fooddelivery.domain.model.OrderStatus
-import vn.edu.student.fooddelivery.ui.components.ErrorState
-import vn.edu.student.fooddelivery.ui.components.LoadingIndicator
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import vn.edu.student.fooddelivery.ui.components.DeliveryTopBar
+import vn.edu.student.fooddelivery.ui.components.FoodArtwork
+import vn.edu.student.fooddelivery.ui.components.OrderSummaryCard
+import vn.edu.student.fooddelivery.ui.components.OrderTimeline
+import vn.edu.student.fooddelivery.ui.components.PrimaryButton
+import vn.edu.student.fooddelivery.ui.components.UiStateContent
+import vn.edu.student.fooddelivery.ui.formatCurrency
+import vn.edu.student.fooddelivery.ui.theme.Spacing
+
 @Composable
-fun ShipperOrderDetailScreen(
-    viewModel: ShipperOrderDetailViewModel,
-    shipperId: String,
-    onNavigateBack: () -> Unit
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    when {
-        uiState.isLoading -> {
-            LoadingIndicator()
-        }
-
-        uiState.error != null && uiState.request == null -> {
-            ErrorState(message = uiState.error!!)
-        }
-
-        uiState.request != null -> {
-            val request = uiState.request!!
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+fun ShipperOrderDetailScreen(viewModel: ShipperOrderDetailViewModel, onBack: () -> Unit) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    Scaffold(topBar = { DeliveryTopBar(stringResource(R.string.order_detail_title), onBack = onBack) }) { padding ->
+        UiStateContent(
+            state = state,
+            modifier = Modifier.padding(padding),
+            emptyMessage = stringResource(R.string.no_data),
+            onRetry = viewModel::retry
+        ) { data ->
+            Column(
+                Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(Spacing.large)
             ) {
-                item {
-                    Text(
-                        text = "Chi tiết đơn hàng",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                }
-
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("Mã đơn: ${request.id}")
-                            Text("Client: ${request.clientId}")
-                            Text("Món ăn: ${request.foodItemId}")
-                            Text("Điểm lấy: ${request.restaurantAddress}")
-                            Text("Điểm giao: ${request.destinationAddress}")
-                            Text("Phí ship: ${request.fee} VND")
-
-                            Text(
-                                text = "Trạng thái: ${request.status}",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
+                OrderSummaryCard(data.request)
+                Spacer(Modifier.height(Spacing.large))
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(Spacing.large)) {
+                        FoodArtwork(data.foodItem.name)
+                        Spacer(Modifier.height(Spacing.medium))
+                        Text(data.foodItem.name, style = MaterialTheme.typography.titleLarge)
+                        Text(formatCurrency(data.foodItem.price), color = MaterialTheme.colorScheme.primary)
                     }
                 }
-
-                item {
-                    Text(
-                        text = "Cập nhật trạng thái",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-
-                when (request.status) {
-
-                    OrderStatus.PENDING -> {
-                        item {
-                            StatusButton(
-                                text = "Nhận đơn",
-                                enabled = !uiState.isUpdating,
-                                onClick = {
-                                    viewModel.acceptOrder(shipperId)
-                                }
-                            )
-                        }
-                    }
-
-                    OrderStatus.ACCEPTED -> {
-                        item {
-                            StatusButton(
-                                text = "Đã lấy hàng",
-                                enabled = !uiState.isUpdating,
-                                onClick = {
-                                    viewModel.updateStatus(
-                                        OrderStatus.PICKED_UP
-                                    )
-                                }
-                            )
-                        }
-                    }
-
-                    OrderStatus.PICKED_UP -> {
-                        item {
-                            StatusButton(
-                                text = "Bắt đầu giao",
-                                enabled = !uiState.isUpdating,
-                                onClick = {
-                                    viewModel.updateStatus(
-                                        OrderStatus.IN_TRANSIT
-                                    )
-                                }
-                            )
-                        }
-                    }
-
-                    OrderStatus.IN_TRANSIT -> {
-                        item {
-                            StatusButton(
-                                text = "Đã giao hàng",
-                                enabled = !uiState.isUpdating,
-                                onClick = {
-                                    viewModel.updateStatus(
-                                        OrderStatus.DELIVERED
-                                    )
-                                }
-                            )
-                        }
-                    }
-
-                    OrderStatus.DELIVERED -> {
-                        item {
-                            Text("Đơn hàng đã hoàn tất.")
-                        }
-                    }
-
-                    OrderStatus.CANCELLED -> {
-                        item {
-                            Text("Đơn hàng đã bị huỷ.")
-                        }
+                Spacer(Modifier.height(Spacing.large))
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(Spacing.large)) {
+                        Text(stringResource(R.string.status_timeline), style = MaterialTheme.typography.titleLarge)
+                        Spacer(Modifier.height(Spacing.medium))
+                        OrderTimeline(data.request.statusHistory, stringResource(R.string.no_status_history))
                     }
                 }
-
-                if (uiState.error != null) {
-                    item {
-                        Text(
-                            text = uiState.error!!,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.padding(4.dp))
-
-                    Text(
-                        text = "Lịch sử trạng thái",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-
-                if (uiState.statusHistory.isEmpty()) {
-                    item {
-                        Text("Chưa có lịch sử trạng thái.")
-                    }
-                } else {
-                    items(uiState.statusHistory) { log ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp)
-                            ) {
-                                Text("Trạng thái: ${log.status}")
-                                Text(
-                                    "Thời gian: ${
-                                        SimpleDateFormat(
-                                            "dd/MM/yyyy HH:mm:ss",
-                                            Locale.getDefault()
-                                        ).format(Date(log.timestamp))
-                                    }"
-                                )
-                            }
-                        }
-                    }
+                nextAction(data.request.status)?.let { (label, status) ->
+                    Spacer(Modifier.height(Spacing.xLarge))
+                    PrimaryButton(label, { viewModel.updateStatus(status) }, loading = data.isUpdating)
                 }
             }
         }
@@ -205,16 +69,9 @@ fun ShipperOrderDetailScreen(
 }
 
 @Composable
-private fun StatusButton(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(text)
-    }
+private fun nextAction(status: OrderStatus): Pair<String, OrderStatus>? = when (status) {
+    OrderStatus.ACCEPTED -> stringResource(R.string.start_pickup) to OrderStatus.PICKED_UP
+    OrderStatus.PICKED_UP -> stringResource(R.string.start_delivery) to OrderStatus.IN_TRANSIT
+    OrderStatus.IN_TRANSIT -> stringResource(R.string.mark_delivered) to OrderStatus.DELIVERED
+    else -> null
 }

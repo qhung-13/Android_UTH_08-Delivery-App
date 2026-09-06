@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import vn.edu.student.fooddelivery.data.local.dao.DeliveryRequestDao
 import vn.edu.student.fooddelivery.data.local.dao.FoodItemDao
 import vn.edu.student.fooddelivery.data.local.dao.RestaurantDao
@@ -22,7 +24,7 @@ import vn.edu.student.fooddelivery.data.local.entity.UserEntity
         DeliveryRequestEntity::class,
         StatusLogEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,9 +44,103 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "fooddelivery.db"
-                ).build()
+                ).addMigrations(MIGRATION_1_2).build()
                 INSTANCE = instance
                 instance
+            }
+        }
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO users(id, name, phone, role)
+                    SELECT DISTINCT clientId, 'Tài khoản Client phục hồi', '0000000000', 'CLIENT'
+                    FROM delivery_requests
+                    WHERE clientId NOT IN (SELECT id FROM users)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO users(id, name, phone, role)
+                    SELECT DISTINCT shipperId, 'Tài khoản Shipper phục hồi', '0000000000', 'SHIPPER'
+                    FROM delivery_requests
+                    WHERE shipperId IS NOT NULL
+                      AND shipperId NOT IN (SELECT id FROM users)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO restaurants(id, name, address, lat, lng)
+                    VALUES ('__recovery_restaurant', 'Dữ liệu phục hồi', 'Không xác định', 0.0, 0.0)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO food_items(id, restaurantId, name, price, weightGram, imageUrl)
+                    SELECT DISTINCT foodItemId, '__recovery_restaurant', 'Món ăn phục hồi', 0.0, 1, ''
+                    FROM delivery_requests
+                    WHERE foodItemId NOT IN (SELECT id FROM food_items)
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS delivery_requests_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        clientId TEXT NOT NULL,
+                        foodItemId TEXT NOT NULL,
+                        restaurantAddress TEXT NOT NULL,
+                        destinationAddress TEXT NOT NULL,
+                        fee REAL NOT NULL,
+                        status TEXT NOT NULL,
+                        shipperId TEXT,
+                        createdAt INTEGER NOT NULL,
+                        lastStatusUpdateAt INTEGER NOT NULL,
+                        FOREIGN KEY(clientId) REFERENCES users(id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+                        FOREIGN KEY(shipperId) REFERENCES users(id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+                        FOREIGN KEY(foodItemId) REFERENCES food_items(id) ON UPDATE NO ACTION ON DELETE NO ACTION
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO delivery_requests_new
+                    SELECT id, clientId, foodItemId, restaurantAddress, destinationAddress,
+                           fee, status, shipperId, createdAt, lastStatusUpdateAt
+                    FROM delivery_requests
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS status_logs_new (
+                        logId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        deliveryRequestId TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        FOREIGN KEY(deliveryRequestId) REFERENCES delivery_requests_new(id)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO status_logs_new(logId, deliveryRequestId, status, timestamp)
+                    SELECT logId, deliveryRequestId, status, timestamp
+                    FROM status_logs
+                    WHERE deliveryRequestId IN (SELECT id FROM delivery_requests_new)
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE status_logs")
+                db.execSQL("DROP TABLE delivery_requests")
+                db.execSQL("ALTER TABLE delivery_requests_new RENAME TO delivery_requests")
+                db.execSQL("ALTER TABLE status_logs_new RENAME TO status_logs")
+
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_delivery_requests_clientId ON delivery_requests(clientId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_delivery_requests_shipperId ON delivery_requests(shipperId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_delivery_requests_foodItemId ON delivery_requests(foodItemId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_delivery_requests_status ON delivery_requests(status)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_status_logs_deliveryRequestId ON status_logs(deliveryRequestId)")
             }
         }
     }

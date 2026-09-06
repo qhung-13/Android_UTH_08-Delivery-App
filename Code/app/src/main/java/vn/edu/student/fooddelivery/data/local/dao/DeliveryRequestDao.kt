@@ -5,7 +5,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import vn.edu.student.fooddelivery.data.local.entity.DeliveryRequestEntity
 import vn.edu.student.fooddelivery.data.local.entity.StatusLogEntity
@@ -13,14 +12,28 @@ import vn.edu.student.fooddelivery.data.local.entity.StatusLogEntity
 @Dao
 interface DeliveryRequestDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(request: DeliveryRequestEntity)
 
-    @Update
-    suspend fun update(request: DeliveryRequestEntity)
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertStatusLog(log: StatusLogEntity)
+
+    @Query(
+        """
+        UPDATE delivery_requests
+        SET status = :newStatus,
+            lastStatusUpdateAt = :timestamp,
+            shipperId = COALESCE(:shipperId, shipperId)
+        WHERE id = :requestId AND status = :expectedStatus
+        """
+    )
+    suspend fun compareAndSetStatus(
+        requestId: String,
+        expectedStatus: String,
+        newStatus: String,
+        timestamp: Long,
+        shipperId: String? = null
+    ): Int
 
     @Query("SELECT * FROM delivery_requests WHERE clientId = :clientId ORDER BY createdAt DESC")
     fun getByClient(clientId: String): Flow<List<DeliveryRequestEntity>>
@@ -42,19 +55,21 @@ interface DeliveryRequestDao {
      * tránh trường hợp update status thành công nhưng log lỗi (hoặc ngược lại).
      */
     @Transaction
-    suspend fun updateStatusWithLog(
+    suspend fun transitionStatusWithLog(
         requestId: String,
+        expectedStatus: String,
         newStatus: String,
         timestamp: Long,
         shipperId: String? = null
-    ) {
-        val current = getById(requestId) ?: return
-        val updated = current.copy(
-            status = newStatus,
-            lastStatusUpdateAt = timestamp,
-            shipperId = shipperId ?: current.shipperId
+    ): Boolean {
+        val changed = compareAndSetStatus(
+            requestId = requestId,
+            expectedStatus = expectedStatus,
+            newStatus = newStatus,
+            timestamp = timestamp,
+            shipperId = shipperId
         )
-        update(updated)
+        if (changed != 1) return false
         insertStatusLog(
             StatusLogEntity(
                 deliveryRequestId = requestId,
@@ -62,6 +77,7 @@ interface DeliveryRequestDao {
                 timestamp = timestamp
             )
         )
+        return true
     }
 
     /**
