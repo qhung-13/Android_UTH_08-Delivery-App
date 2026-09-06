@@ -6,122 +6,103 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import vn.edu.student.fooddelivery.domain.model.*
-import vn.edu.student.fooddelivery.data.repository.*
+import vn.edu.student.fooddelivery.data.repository.DeliveryRepository
+import vn.edu.student.fooddelivery.data.repository.FoodRepository
+import vn.edu.student.fooddelivery.data.repository.UserRepository
+import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
+import vn.edu.student.fooddelivery.domain.model.FoodItem
+import vn.edu.student.fooddelivery.domain.model.OrderStatus
+import vn.edu.student.fooddelivery.domain.model.Restaurant
+import vn.edu.student.fooddelivery.domain.model.Role
 import vn.edu.student.fooddelivery.domain.util.FeeCalculator
 import vn.edu.student.fooddelivery.domain.util.UiState
+import vn.edu.student.fooddelivery.domain.util.runSuspendCatching
 import vn.edu.student.fooddelivery.domain.validation.InputValidator
 import java.util.UUID
 
+data class CreateOrderData(
+    val foodItem: FoodItem,
+    val restaurant: Restaurant,
+    val fee: FeeCalculator.Breakdown,
+    val address: String = "",
+    val addressError: String? = null,
+    val isSubmitting: Boolean = false
+)
+
 class CreateOrderViewModel(
     savedStateHandle: SavedStateHandle,
-    private val foodRepo: FoodRepository,
-    private val deliveryRepo: DeliveryRepository,
-    private val userRepo: UserRepository
+    private val foodRepository: FoodRepository,
+    private val deliveryRepository: DeliveryRepository,
+    private val userRepository: UserRepository
 ) : ViewModel() {
+    private val foodId = savedStateHandle.get<String>("foodId").orEmpty()
+    private val _uiState = MutableStateFlow<UiState<CreateOrderData>>(UiState.Loading)
+    val uiState: StateFlow<UiState<CreateOrderData>> = _uiState.asStateFlow()
 
-    private val foodId: String = checkNotNull(savedStateHandle["foodId"])
+    init { retry() }
 
-    private var currentFood: FoodItem? = null
-    private var currentRestaurant: Restaurant? = null
-
-    private val _uiState = MutableStateFlow<UiState<Unit>>(UiState.Success(Unit))
-    val uiState: StateFlow<UiState<Unit>> = _uiState.asStateFlow()
-
-    private val _address = MutableStateFlow("")
-    val address: StateFlow<String> = _address.asStateFlow()
-
-    private val _addressError = MutableStateFlow<String?>(null)
-    val addressError: StateFlow<String?> = _addressError.asStateFlow()
-
-    // ---- MỚI: hiển thị cho người dùng thấy trước khi xác nhận ----
-    private val _restaurantAddress = MutableStateFlow("")
-    val restaurantAddress: StateFlow<String> = _restaurantAddress.asStateFlow()
-
-    private val _feePreview = MutableStateFlow<Double?>(null)
-    val feePreview: StateFlow<Double?> = _feePreview.asStateFlow()
-    // ----------------------------------------------------------------
-
-    init {
-        loadOrderData()
-    }
-
-    private fun loadOrderData() {
+    fun retry() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            try {
-                currentFood = foodRepo.getFoodItemById(foodId)
-                currentRestaurant = currentFood?.let { foodRepo.getRestaurantById(it.restaurantId) }
-
-                currentRestaurant?.let { _restaurantAddress.value = it.address }
-                currentFood?.let { food ->
-                    val distanceKm = 5.0 // TODO: mock, chưa có Maps API — ghi rõ trong báo cáo
-                    _feePreview.value = FeeCalculator.calculate(distanceKm, food.weightGram)
-                }
-
-                _uiState.value = UiState.Success(Unit)
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Error loading data")
+            runSuspendCatching {
+                require(foodId.isNotBlank()) { "Mã món ăn không hợp lệ" }
+                val food = foodRepository.getFoodItemById(foodId) ?: error("Không tìm thấy món ăn")
+                val restaurant = foodRepository.getRestaurantById(food.restaurantId)
+                    ?: error("Không tìm thấy nhà hàng")
+                CreateOrderData(food, restaurant, FeeCalculator.breakdown(MOCK_DISTANCE_KM, food.weightGram))
             }
+                .onSuccess { _uiState.value = UiState.Success(it) }
+                .onFailure { _uiState.value = UiState.Error(it.message ?: "Không thể chuẩn bị đơn") }
         }
     }
 
-    fun onAddressChange(newAddress: String) {
-        _address.value = newAddress
-        _addressError.value = if (!InputValidator.isValidAddress(newAddress)) {
-            "Địa chỉ phải có ít nhất 5 ký tự"
-        } else {
-            null
-        }
+    fun onAddressChange(value: String) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            current.copy(
+                address = value,
+                addressError = if (value.isEmpty() || InputValidator.isValidAddress(value)) null
+                else "Địa chỉ phải có ít nhất 5 ký tự"
+            )
+        )
     }
 
-    fun submitOrder(onSuccess: () -> Unit) {
-        val destAddress = _address.value.trim()
-
-        if (!InputValidator.isValidAddress(destAddress)) {
-            _addressError.value = "Địa chỉ phải có ít nhất 5 ký tự"
+    fun submit(onSuccess: () -> Unit) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        if (current.isSubmitting) return
+        if (!InputValidator.isValidAddress(current.address)) {
+            _uiState.value = UiState.Success(current.copy(addressError = "Địa chỉ phải có ít nhất 5 ký tự"))
             return
         }
-
-        val fee = _feePreview.value
-        if (fee == null) {
-            _uiState.value = UiState.Error("Chưa tính được phí ship, thử lại")
-            return
-        }
-
         viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            try {
-                val user = userRepo.getCurrentUser().firstOrNull() ?: throw Exception("User not logged in")
-                val food = currentFood ?: throw Exception("Food missing")
-                val restaurant = currentRestaurant ?: throw Exception("Restaurant missing")
-
-                val newRequest = DeliveryRequest(
+            _uiState.value = UiState.Success(current.copy(isSubmitting = true, addressError = null))
+            runSuspendCatching {
+                val user = userRepository.getCurrentUser().first() ?: error("Bạn chưa đăng nhập")
+                require(user.role == Role.CLIENT) { "Chỉ Client mới được tạo đơn" }
+                val now = System.currentTimeMillis()
+                val request = DeliveryRequest(
                     id = UUID.randomUUID().toString(),
                     clientId = user.id,
-                    foodItemId = food.id,
-                    restaurantAddress = restaurant.address,
-                    destinationAddress = destAddress,
-                    fee = fee,
+                    foodItemId = current.foodItem.id,
+                    restaurantAddress = current.restaurant.address,
+                    destinationAddress = current.address.trim(),
+                    fee = current.fee.total,
                     status = OrderStatus.PENDING,
                     shipperId = null,
-                    createdAt = System.currentTimeMillis(),
-                    lastStatusUpdateAt = System.currentTimeMillis(),
-                    statusHistory = emptyList()
+                    createdAt = now,
+                    lastStatusUpdateAt = now
                 )
-
-                val result = deliveryRepo.createRequest(newRequest)
-                if (result.isSuccess) {
-                    _uiState.value = UiState.Success(Unit)
-                    onSuccess()
-                } else {
-                    _uiState.value = UiState.Error(result.exceptionOrNull()?.message ?: "Tạo đơn thất bại")
-                }
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Lỗi hệ thống")
+                deliveryRepository.createRequest(request).getOrThrow()
+            }
+                .onSuccess { onSuccess() }
+                .onFailure { error -> _uiState.value = UiState.Error(error.message ?: "Tạo đơn thất bại") }
+            if (_uiState.value is UiState.Success) {
+                _uiState.value = UiState.Success(current.copy(isSubmitting = false))
             }
         }
     }
+
+    companion object { const val MOCK_DISTANCE_KM = 5.0 }
 }
