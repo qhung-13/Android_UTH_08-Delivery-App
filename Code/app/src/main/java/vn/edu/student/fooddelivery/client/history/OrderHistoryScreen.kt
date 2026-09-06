@@ -1,52 +1,76 @@
 package vn.edu.student.fooddelivery.client.history
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
-import vn.edu.student.fooddelivery.data.repository.DeliveryRepository
-import vn.edu.student.fooddelivery.data.repository.UserRepository
-import vn.edu.student.fooddelivery.domain.model.DeliveryRequest
-import vn.edu.student.fooddelivery.domain.util.UiState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import vn.edu.student.fooddelivery.R
+import vn.edu.student.fooddelivery.ui.components.BottomDestination
+import vn.edu.student.fooddelivery.ui.components.DeliveryBottomBar
+import vn.edu.student.fooddelivery.ui.components.DeliveryTopBar
+import vn.edu.student.fooddelivery.ui.components.OrderSummaryCard
+import vn.edu.student.fooddelivery.ui.components.OrderTimeline
+import vn.edu.student.fooddelivery.ui.components.UiStateContent
+import vn.edu.student.fooddelivery.ui.theme.Spacing
 
-class OrderHistoryViewModel(
-    private val deliveryRepository: DeliveryRepository,
-    private val userRepository: UserRepository
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow<UiState<List<DeliveryRequest>>>(UiState.Loading)
-    val uiState: StateFlow<UiState<List<DeliveryRequest>>> = _uiState.asStateFlow()
-
-    init {
-        loadHistory()
-    }
-
-    fun loadHistory() {
-        viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            try {
-                val user = userRepository.getCurrentUser().firstOrNull()
-                if (user != null) {
-                    deliveryRepository.getRequestsByClient(user.id)
-                        .catch { e ->
-                            _uiState.value = UiState.Error(e.message ?: "Có lỗi xảy ra")
-                        }
-                        .collect { requests ->
-                            _uiState.value = if (requests.isEmpty()) {
-                                UiState.Empty
-                            } else {
-                                UiState.Success(requests)
+@Composable
+fun OrderHistoryScreen(
+    viewModel: OrderHistoryViewModel,
+    onNavigateHome: () -> Unit,
+    onNavigateTracking: () -> Unit,
+    onAccount: () -> Unit
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    Scaffold(
+        topBar = { DeliveryTopBar(stringResource(R.string.history_title), accountLabel = stringResource(R.string.account), onAccount = onAccount) },
+        bottomBar = {
+            DeliveryBottomBar(
+                listOf(
+                    BottomDestination(stringResource(R.string.nav_home), "⌂", false, onNavigateHome),
+                    BottomDestination(stringResource(R.string.nav_tracking), "◉", false, onNavigateTracking),
+                    BottomDestination(stringResource(R.string.nav_history), "✓", true) {}
+                )
+            )
+        }
+    ) { padding ->
+        UiStateContent(
+            state = state,
+            modifier = Modifier.padding(padding),
+            emptyMessage = stringResource(R.string.empty_history),
+            onRetry = viewModel::retry
+        ) { orders ->
+            LazyColumn(
+                modifier = Modifier.padding(padding),
+                contentPadding = PaddingValues(Spacing.large),
+                verticalArrangement = Arrangement.spacedBy(Spacing.large)
+            ) {
+                items(orders, key = { it.id }) { order ->
+                    Column {
+                        OrderSummaryCard(order)
+                        Spacer(Modifier.height(Spacing.small))
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(Spacing.large)) {
+                                Text(stringResource(R.string.status_timeline), style = MaterialTheme.typography.titleMedium)
+                                Spacer(Modifier.height(Spacing.medium))
+                                OrderTimeline(order.statusHistory, stringResource(R.string.no_status_history))
                             }
                         }
-                } else {
-                    _uiState.value = UiState.Error("Chưa đăng nhập")
+                    }
                 }
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Có lỗi xảy ra")
             }
         }
     }

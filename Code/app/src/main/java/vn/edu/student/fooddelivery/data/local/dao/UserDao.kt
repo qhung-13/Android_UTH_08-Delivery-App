@@ -9,7 +9,7 @@ import vn.edu.student.fooddelivery.data.local.entity.UserEntity
 @Dao
 interface UserDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(user: UserEntity)
 
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
