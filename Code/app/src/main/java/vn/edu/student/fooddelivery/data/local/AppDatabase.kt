@@ -113,55 +113,28 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     """
-                    CREATE TABLE status_logs_backup (
-                        logId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    CREATE TABLE IF NOT EXISTS status_logs_new (
+                        logId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         deliveryRequestId TEXT NOT NULL,
                         status TEXT NOT NULL,
-                        timestamp INTEGER NOT NULL
+                        timestamp INTEGER NOT NULL,
+                        FOREIGN KEY(deliveryRequestId) REFERENCES delivery_requests_new(id)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                     """.trimIndent()
                 )
-
                 db.execSQL(
                     """
-                    INSERT INTO status_logs_backup(logId, deliveryRequestId, status, timestamp)
+                    INSERT INTO status_logs_new(logId, deliveryRequestId, status, timestamp)
                     SELECT logId, deliveryRequestId, status, timestamp
                     FROM status_logs
                     WHERE deliveryRequestId IN (SELECT id FROM delivery_requests_new)
                     """.trimIndent()
                 )
-
-                // Xóa bảng cũ
                 db.execSQL("DROP TABLE status_logs")
                 db.execSQL("DROP TABLE delivery_requests")
-
-                // Đổi bảng mới thành tên chính thức
                 db.execSQL("ALTER TABLE delivery_requests_new RENAME TO delivery_requests")
-
-                // Tạo lại status_logs với FK trỏ đúng delivery_requests
-                db.execSQL(
-                    """
-                    CREATE TABLE status_logs (
-                        logId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                        deliveryRequestId TEXT NOT NULL,
-                        status TEXT NOT NULL,
-                        timestamp INTEGER NOT NULL,
-                        FOREIGN KEY(deliveryRequestId) REFERENCES delivery_requests(id)
-                            ON UPDATE NO ACTION ON DELETE CASCADE
-                    )
-                    """.trimIndent()
-                )
-
-// Khôi phục status logs
-                db.execSQL(
-                    """
-    INSERT INTO status_logs(logId, deliveryRequestId, status, timestamp)
-    SELECT logId, deliveryRequestId, status, timestamp
-    FROM status_logs_backup
-    """.trimIndent()
-                )
-
-                db.execSQL("DROP TABLE status_logs_backup")
+                db.execSQL("ALTER TABLE status_logs_new RENAME TO status_logs")
 
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_delivery_requests_clientId ON delivery_requests(clientId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_delivery_requests_shipperId ON delivery_requests(shipperId)")
