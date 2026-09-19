@@ -100,10 +100,13 @@ class AuthViewModel(private val userRepository: UserRepository) : ViewModel() {
         }
     }
 
-    fun logout() {
-        _currentUser.value = UiState.Success(null)
+    fun logout(onLoggedOut: () -> Unit = {}) {
         viewModelScope.launch {
             runSuspendCatching { userRepository.clearCurrentUser() }
+                .onSuccess {
+                    _currentUser.value = UiState.Success(null)
+                    onLoggedOut()
+                }
                 .onFailure { error -> _uiState.value = _uiState.value.copy(error = error.userMessage()) }
         }
     }

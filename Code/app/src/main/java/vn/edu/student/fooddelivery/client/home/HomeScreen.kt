@@ -94,7 +94,9 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Spacing.large)
                 )
-                if (visibleItems.isEmpty()) {
+                if (data.foodItems.isEmpty()) {
+                    EmptyState(stringResource(R.string.empty_food_list), Modifier.weight(1f))
+                } else if (visibleItems.isEmpty()) {
                     EmptyState(stringResource(R.string.empty_search), Modifier.weight(1f))
                 } else {
                     FoodGrid(visibleItems, onNavigateToFoodDetail, Modifier.weight(1f))

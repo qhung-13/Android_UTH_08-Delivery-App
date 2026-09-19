@@ -59,7 +59,18 @@ class MyOrdersViewModel(
         if (current.updatingOrderId != null) return
         viewModelScope.launch {
             _uiState.value = UiState.Success(current.copy(updatingOrderId = orderId, actionError = null))
-            deliveryRepository.updateStatus(orderId, newStatus)
+            val user = runSuspendCatching { userRepository.getCurrentUser().first() }
+                .getOrElse { error ->
+                    _uiState.value = UiState.Success(
+                        current.copy(actionError = error.message ?: "Không thể đọc phiên đăng nhập")
+                    )
+                    return@launch
+                }
+            if (user == null || user.role != Role.SHIPPER) {
+                _uiState.value = UiState.Success(current.copy(actionError = "Tài khoản không có quyền Shipper"))
+                return@launch
+            }
+            deliveryRepository.updateStatus(orderId, newStatus, user.id)
                 .onFailure { error ->
                     _uiState.value = UiState.Success(
                         current.copy(actionError = error.message ?: "Cập nhật trạng thái thất bại")
