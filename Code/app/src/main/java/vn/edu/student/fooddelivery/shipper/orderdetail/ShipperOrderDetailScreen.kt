@@ -59,6 +59,10 @@ fun ShipperOrderDetailScreen(viewModel: ShipperOrderDetailViewModel, onBack: () 
                         OrderTimeline(data.request.statusHistory, stringResource(R.string.no_status_history))
                     }
                 }
+                data.actionError?.let { error ->
+                    Spacer(Modifier.height(Spacing.medium))
+                    Text(error, color = MaterialTheme.colorScheme.error)
+                }
                 nextAction(data.request.status)?.let { (label, status) ->
                     Spacer(Modifier.height(Spacing.xLarge))
                     PrimaryButton(label, { viewModel.updateStatus(status) }, loading = data.isUpdating)
