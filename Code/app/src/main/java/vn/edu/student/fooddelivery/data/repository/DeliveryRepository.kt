@@ -17,12 +17,12 @@ import vn.edu.student.fooddelivery.domain.validation.InputValidator
 
 interface DeliveryRepository {
     suspend fun createRequest(request: DeliveryRequest): Result<Unit>
-    suspend fun cancelRequest(requestId: String): Result<Unit>
+    suspend fun cancelRequest(requestId: String, clientId: String): Result<Unit>
     fun getRequestsByClient(clientId: String): Flow<List<DeliveryRequest>>
     fun getPendingRequests(): Flow<List<DeliveryRequest>>
     fun getRequestsByShipper(shipperId: String): Flow<List<DeliveryRequest>>
     suspend fun acceptRequest(requestId: String, shipperId: String): Result<Unit>
-    suspend fun updateStatus(requestId: String, newStatus: OrderStatus): Result<Unit>
+    suspend fun updateStatus(requestId: String, newStatus: OrderStatus, shipperId: String): Result<Unit>
     suspend fun getRequestById(requestId: String): Result<DeliveryRequest>
     suspend fun getStatusHistory(requestId: String): Result<List<StatusLog>>
 }
@@ -49,8 +49,25 @@ class DeliveryRepositoryImpl(
         dao.insertWithInitialLog(request.toEntity())
     }
 
-    override suspend fun cancelRequest(requestId: String): Result<Unit> =
-        updateStatus(requestId, OrderStatus.CANCELLED)
+    override suspend fun cancelRequest(requestId: String, clientId: String): Result<Unit> =
+        runSuspendCatching {
+            require(requestId.isNotBlank()) { "Mã đơn hàng không hợp lệ" }
+            val client = userDao.getById(clientId) ?: error("Không tìm thấy tài khoản Client")
+            require(client.role == Role.CLIENT.name) { "Chỉ Client mới được hủy đơn" }
+            val current = dao.getById(requestId) ?: error("Không tìm thấy đơn hàng")
+            require(current.clientId == clientId) { "Đơn hàng không thuộc tài khoản này" }
+            val currentStatus = current.status.toOrderStatus()
+            require(OrderStatusValidator.canTransition(currentStatus, OrderStatus.CANCELLED)) {
+                "Không thể hủy đơn ở trạng thái ${currentStatus.name}"
+            }
+            val changed = dao.transitionStatusWithLog(
+                requestId = requestId,
+                expectedStatus = currentStatus.name,
+                newStatus = OrderStatus.CANCELLED.name,
+                timestamp = System.currentTimeMillis()
+            )
+            check(changed) { "Trạng thái đơn vừa thay đổi. Vui lòng tải lại" }
+        }
 
     override fun getRequestsByClient(clientId: String): Flow<List<DeliveryRequest>> =
         dao.getByClient(clientId).withHistory()
@@ -81,16 +98,20 @@ class DeliveryRepositoryImpl(
             check(changed) { "Đơn vừa được Shipper khác nhận. Vui lòng tải lại danh sách" }
         }
 
-    override suspend fun updateStatus(requestId: String, newStatus: OrderStatus): Result<Unit> =
+    override suspend fun updateStatus(
+        requestId: String,
+        newStatus: OrderStatus,
+        shipperId: String
+    ): Result<Unit> =
         runSuspendCatching {
             require(requestId.isNotBlank()) { "Mã đơn hàng không hợp lệ" }
+            val shipper = userDao.getById(shipperId) ?: error("Không tìm thấy tài khoản Shipper")
+            require(shipper.role == Role.SHIPPER.name) { "Chỉ Shipper mới được cập nhật trạng thái" }
             val current = dao.getById(requestId) ?: error("Không tìm thấy đơn hàng")
+            require(current.shipperId == shipperId) { "Đơn hàng không thuộc tài khoản này" }
             val currentStatus = current.status.toOrderStatus()
             require(OrderStatusValidator.canTransition(currentStatus, newStatus)) {
                 "Không thể chuyển từ ${currentStatus.name} sang ${newStatus.name}"
-            }
-            require(newStatus == OrderStatus.CANCELLED || current.shipperId != null) {
-                "Đơn chưa được Shipper nhận"
             }
             val changed = dao.transitionStatusWithLog(
                 requestId = requestId,
