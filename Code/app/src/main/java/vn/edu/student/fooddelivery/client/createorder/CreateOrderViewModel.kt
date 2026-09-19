@@ -28,6 +28,7 @@ data class CreateOrderData(
     val fee: FeeCalculator.Breakdown,
     val address: String = "",
     val addressError: String? = null,
+    val submitError: String? = null,
     val isSubmitting: Boolean = false
 )
 
@@ -64,7 +65,8 @@ class CreateOrderViewModel(
             current.copy(
                 address = value,
                 addressError = if (value.isEmpty() || InputValidator.isValidAddress(value)) null
-                else "Địa chỉ phải có ít nhất 5 ký tự"
+                else "Địa chỉ phải có ít nhất 5 ký tự",
+                submitError = null
             )
         )
     }
@@ -77,7 +79,9 @@ class CreateOrderViewModel(
             return
         }
         viewModelScope.launch {
-            _uiState.value = UiState.Success(current.copy(isSubmitting = true, addressError = null))
+            _uiState.value = UiState.Success(
+                current.copy(isSubmitting = true, addressError = null, submitError = null)
+            )
             runSuspendCatching {
                 val user = userRepository.getCurrentUser().first() ?: error("Bạn chưa đăng nhập")
                 require(user.role == Role.CLIENT) { "Chỉ Client mới được tạo đơn" }
@@ -96,11 +100,18 @@ class CreateOrderViewModel(
                 )
                 deliveryRepository.createRequest(request).getOrThrow()
             }
-                .onSuccess { onSuccess() }
-                .onFailure { error -> _uiState.value = UiState.Error(error.message ?: "Tạo đơn thất bại") }
-            if (_uiState.value is UiState.Success) {
-                _uiState.value = UiState.Success(current.copy(isSubmitting = false))
-            }
+                .onSuccess {
+                    _uiState.value = UiState.Success(current.copy(isSubmitting = false))
+                    onSuccess()
+                }
+                .onFailure { error ->
+                    _uiState.value = UiState.Success(
+                        current.copy(
+                            isSubmitting = false,
+                            submitError = error.message ?: "Tạo đơn thất bại"
+                        )
+                    )
+                }
         }
     }
 

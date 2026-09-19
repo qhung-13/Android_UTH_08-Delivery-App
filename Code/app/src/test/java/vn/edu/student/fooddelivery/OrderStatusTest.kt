@@ -58,40 +58,22 @@ class OrderStatusTest {
 
     @Test
     fun `invalid order status transitions`() {
-        assertFalse(
-            OrderStatusValidator.canTransition(
-                OrderStatus.PENDING,
-                OrderStatus.DELIVERED
-            )
+        val valid = setOf(
+            OrderStatus.PENDING to OrderStatus.ACCEPTED,
+            OrderStatus.PENDING to OrderStatus.CANCELLED,
+            OrderStatus.ACCEPTED to OrderStatus.PICKED_UP,
+            OrderStatus.ACCEPTED to OrderStatus.CANCELLED,
+            OrderStatus.PICKED_UP to OrderStatus.IN_TRANSIT,
+            OrderStatus.IN_TRANSIT to OrderStatus.DELIVERED
         )
 
-        assertFalse(
-            OrderStatusValidator.canTransition(
-                OrderStatus.PENDING,
-                OrderStatus.IN_TRANSIT
-            )
-        )
-
-        assertFalse(
-            OrderStatusValidator.canTransition(
-                OrderStatus.ACCEPTED,
-                OrderStatus.DELIVERED
-            )
-        )
-
-        assertFalse(
-            OrderStatusValidator.canTransition(
-                OrderStatus.DELIVERED,
-                OrderStatus.ACCEPTED
-            )
-        )
-
-        assertFalse(
-            OrderStatusValidator.canTransition(
-                OrderStatus.CANCELLED,
-                OrderStatus.ACCEPTED
-            )
-        )
+        for (from in OrderStatus.entries) {
+            for (to in OrderStatus.entries) {
+                if ((from to to) !in valid) {
+                    assertFalse("Unexpected transition: $from -> $to", OrderStatusValidator.canTransition(from, to))
+                }
+            }
+        }
     }
 
     @Test

@@ -20,7 +20,8 @@ import vn.edu.student.fooddelivery.domain.util.runSuspendCatching
 data class ShipperOrderDetailData(
     val request: DeliveryRequest,
     val foodItem: FoodItem,
-    val isUpdating: Boolean = false
+    val isUpdating: Boolean = false,
+    val actionError: String? = null
 )
 
 class ShipperOrderDetailViewModel(
@@ -55,10 +56,27 @@ class ShipperOrderDetailViewModel(
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         if (current.isUpdating) return
         viewModelScope.launch {
-            _uiState.value = UiState.Success(current.copy(isUpdating = true))
-            deliveryRepository.updateStatus(requestId, newStatus)
+            _uiState.value = UiState.Success(current.copy(isUpdating = true, actionError = null))
+            val user = runSuspendCatching { userRepository.getCurrentUser().first() }
+                .getOrElse {
+                    _uiState.value = UiState.Success(
+                        current.copy(actionError = it.message ?: "Không thể đọc phiên đăng nhập")
+                    )
+                    return@launch
+                }
+            if (user == null || user.role != Role.SHIPPER) {
+                _uiState.value = UiState.Success(
+                    current.copy(actionError = "Tài khoản không có quyền Shipper")
+                )
+                return@launch
+            }
+            deliveryRepository.updateStatus(requestId, newStatus, user.id)
                 .onSuccess { retry() }
-                .onFailure { _uiState.value = UiState.Error(it.message ?: "Cập nhật trạng thái thất bại") }
+                .onFailure {
+                    _uiState.value = UiState.Success(
+                        current.copy(actionError = it.message ?: "Cập nhật trạng thái thất bại")
+                    )
+                }
         }
     }
 }

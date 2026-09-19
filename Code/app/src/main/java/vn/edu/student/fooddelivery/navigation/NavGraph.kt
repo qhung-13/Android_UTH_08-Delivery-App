@@ -82,12 +82,10 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 viewModel = authViewModel,
                 onAccountSelected = { navigateRoot(roleRoute(it)) },
                 onCreateNewAccount = {
-                    authViewModel.logout()
-                    navigateRoot(Screen.Login.route)
+                    authViewModel.logout { navigateRoot(Screen.Login.route) }
                 },
                 onLogout = {
-                    authViewModel.logout()
-                    navigateRoot(Screen.Login.route)
+                    authViewModel.logout { navigateRoot(Screen.Login.route) }
                 }
             )
         }
