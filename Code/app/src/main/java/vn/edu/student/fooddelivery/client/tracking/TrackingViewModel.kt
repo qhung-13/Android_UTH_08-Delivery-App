@@ -60,7 +60,18 @@ class TrackingViewModel(
         if (current.busyOrderId != null) return
         viewModelScope.launch {
             _uiState.value = UiState.Success(current.copy(busyOrderId = orderId, actionError = null))
-            deliveryRepository.cancelRequest(orderId)
+            val user = runSuspendCatching { userRepository.getCurrentUser().first() }
+                .getOrElse { error ->
+                    _uiState.value = UiState.Success(
+                        current.copy(actionError = error.message ?: "Không thể đọc phiên đăng nhập")
+                    )
+                    return@launch
+                }
+            if (user == null || user.role != Role.CLIENT) {
+                _uiState.value = UiState.Success(current.copy(actionError = "Tài khoản không có quyền Client"))
+                return@launch
+            }
+            deliveryRepository.cancelRequest(orderId, user.id)
                 .onFailure { error ->
                     _uiState.value = UiState.Success(
                         current.copy(actionError = error.message ?: "Hủy đơn thất bại")
